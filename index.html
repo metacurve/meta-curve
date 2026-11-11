@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>META CURVE</title>
+<style>
+  :root{
+    --bg:#000000; --panel:#050505; --panel2:#0a0a0a; --line:#222222; --line2:#333333;
+    --txt:#ffffff; --sub:#d1d5db; --mut:#9a9a9a; --faint:#666666;
+    --accent:#ffffff; --warn:#c05555;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--sub);
+    font-family:Inter,"Segoe UI",system-ui,-apple-system,"Helvetica Neue","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    font-size:13px;letter-spacing:.01em;-webkit-font-smoothing:antialiased}
+  .num{font-family:ui-monospace,"SF Mono",Consolas,monospace;font-variant-numeric:tabular-nums}
+
+  /* ── intro ── */
+  #splash{position:fixed;inset:0;z-index:99;background:#000;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;overflow:hidden;transition:opacity .8s}
+  #splash.out{opacity:0;pointer-events:none}
+  .pill-stage{position:relative;width:340px;height:200px;display:flex;align-items:center;justify-content:center}
+  .pill{width:74px;height:26px;border-radius:13px;background:#fff;position:relative;z-index:3;
+    box-shadow:0 0 24px #ffffff44;animation:pillSeq 4.6s cubic-bezier(.2,.7,.3,1) .3s forwards}
+  @keyframes pillSeq{
+    0%{transform:scale(0);opacity:0}
+    22%{transform:scale(1);opacity:1}
+    48%{transform:scale(1)}
+    100%{transform:scaleX(16) scaleY(.55);opacity:.85}
+  }
+  .glow{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:74px;height:26px;border-radius:13px;
+    background:#fff;filter:blur(18px);opacity:0;z-index:1;animation:glowUp 4.6s ease .3s forwards}
+  @keyframes glowUp{0%{opacity:0}30%{opacity:.45}100%{opacity:.85}}
+  #splash h1{position:absolute;top:60px;left:0;right:0;text-align:center;color:#fff;font-size:15px;
+    font-weight:600;letter-spacing:.5em;text-transform:uppercase}
+  #splash p{position:absolute;bottom:50px;left:0;right:0;text-align:center;color:var(--faint);
+    font-size:10px;letter-spacing:.34em;text-transform:uppercase;animation:blink 2.8s ease-in-out infinite}
+  @keyframes blink{0%,100%{opacity:.2}50%{opacity:.8}}
+
+  /* ── main ── */
+  header{max-width:1180px;margin:0 auto;padding:22px 16px 10px;border-bottom:1px solid var(--line)}
+  header h1{font-size:15px;font-weight:700;letter-spacing:.42em;text-transform:uppercase;color:#fff}
+  .wrap{max-width:1180px;margin:0 auto;padding:16px 16px 46px;display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start}
+  @media(max-width:900px){.wrap{grid-template-columns:1fr}}
+  .card{background:transparent;border:none;border-radius:0;padding:0;margin-bottom:22px}
+  .card h2{font-size:10px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.26em;
+    margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  label{font-size:9.5px;color:var(--mut);display:block;margin-bottom:5px;letter-spacing:.16em;text-transform:uppercase}
+  select,input[type=number],input[type=time]{background:#070707;border:1px solid var(--line2);color:var(--txt);
+    border-radius:0;padding:8px 10px;font-size:12.5px;outline:none;width:100%}
+  select:focus,input:focus{border-color:#fff}
+  .row{display:flex;gap:8px;margin-bottom:10px}
+  .row>div{flex:1}
+  button{background:transparent;border:1px solid var(--line2);color:var(--txt);border-radius:0;
+    padding:8px 12px;font-size:11px;cursor:pointer;letter-spacing:.1em;text-transform:uppercase;transition:border-color .15s,color .15s}
+  button:hover{border-color:#fff;color:#fff}
+  .btn-run{background:#0d0d0d;border:1px solid rgba(255,255,255,.35);color:#fff;font-weight:600;
+    width:100%;letter-spacing:.2em;text-transform:uppercase;font-size:11px;padding:11px 14px;
+    display:flex;justify-content:space-between;align-items:center}
+  .btn-run::after{content:"→";letter-spacing:0}
+  .btn-run:hover{background:#161616}
+  .btn-run:disabled{opacity:.45;cursor:wait}
+  .btn-apply{border-color:rgba(255,255,255,.35);padding:4px 12px;font-size:10px}
+  .btn-del{color:var(--faint);border:none;background:none;padding:3px 6px;text-transform:none;letter-spacing:0}
+  .btn-del:hover{color:var(--warn)}
+  .plan{border:none;border-left:2px solid var(--line2);border-radius:0;padding:8px 0 8px 12px;margin-bottom:14px;background:transparent}
+  .plan-head{display:flex;gap:8px;align-items:center;margin-bottom:7px}
+  .dot{width:8px;height:8px;border-radius:0;flex:none}
+  .time-chip{display:flex;align-items:center;gap:4px;background:#070707;border:1px solid var(--line);border-radius:0;padding:2px 6px}
+  .time-chip input{width:88px;border:none;background:transparent;padding:3px 2px;font-size:12px}
+  .time-chip .rm{background:none;border:none;color:var(--faint);font-size:13px;padding:1px 3px;cursor:pointer}
+  .time-chip .rm:hover{color:var(--warn)}
+  .add-time{padding:5px 10px;font-size:10px;color:var(--mut)}
+  .seg{display:flex;border:none;border-bottom:1px solid var(--line);border-radius:0;overflow:visible}
+  .seg button{border:none;border-radius:0;padding:8px 0;margin-right:18px;font-size:10.5px;color:var(--faint);
+    letter-spacing:.22em;text-transform:uppercase;background:none;position:relative}
+  .seg button.on{color:#fff;font-weight:600}
+  .seg button.on::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:#fff}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:16px}
+  @media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}}
+  .stat{background:#020202;padding:12px 14px}
+  .stat .k{font-size:9px;color:var(--faint);margin-bottom:5px;letter-spacing:.2em;text-transform:uppercase}
+  .stat .v{font-size:21px;font-weight:700;color:#fff;line-height:1.1}
+  .stat .s{font-size:9.5px;color:var(--faint);margin-top:4px}
+  #chartbox{position:relative;border:1px solid var(--line);background:#020202;padding:4px}
+  canvas{display:block;width:100%;height:340px}
+  #tip{position:absolute;pointer-events:none;display:none;background:#000000f2;border:1px solid var(--line2);
+    border-radius:0;padding:7px 10px;font-size:11px;line-height:1.65;white-space:nowrap;z-index:5}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin:10px 2px 0;font-size:10px;color:var(--mut);
+    letter-spacing:.06em;text-transform:uppercase}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .legend i{width:14px;height:2px;border-radius:0;display:inline-block}
+  .empty{color:var(--faint);font-size:11.5px;padding:20px 8px;text-align:center;line-height:1.8;letter-spacing:.04em}
+  .rec{border:1px solid var(--line);border-radius:0;padding:10px 12px;margin-bottom:8px;background:#030303}
+  .rec.best{border-color:#fff;background:#080808}
+  .rec-head{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:3px}
+  .rec-name{font-weight:600;font-size:12.5px;color:#fff;letter-spacing:.04em}
+  .badge{font-size:8.5px;color:#fff;border:1px solid #fff;border-radius:0;padding:2px 7px;flex:none;letter-spacing:.2em;text-transform:uppercase}
+  .badge.alt{color:var(--mut);border-color:var(--line2)}
+  .rec-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px 10px;font-size:10.5px;color:var(--mut);margin-top:7px}
+  .rec-grid b{color:#fff;font-family:ui-monospace,Consolas,monospace;font-variant-numeric:tabular-nums}
+  .rec-grid .lb{font-size:8.5px;color:var(--faint);letter-spacing:.14em;text-transform:uppercase;margin-bottom:1px}
+  .rec-foot{display:flex;justify-content:space-between;align-items:center;margin-top:7px}
+  .rec-times{font-size:10.5px;color:var(--mut)}
+  .rec-times b{color:#fff;font-family:ui-monospace,Consolas,monospace}
+  .slope{color:#fff}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  button:focus-visible,select:focus-visible,input:focus-visible{outline:1px solid #fff;outline-offset:2px}
+</style>
+</head>
+<body>
+
+<!-- ── 인트로: 검은 바탕, 흰 알약이 옆으로 퍼짐, 클릭하면 진입 ── -->
+<div id="splash">
+  <h1>META CURVE</h1>
+  <div class="pill-stage">
+    <div class="glow"></div>
+    <div class="pill"></div>
+  </div>
+  <p>click anywhere to enter</p>
+</div>
+
+<header>
+  <h1>META<b> </b>CURVE</h1>
+</header>
+
+<div class="wrap">
+  <!-- ── 좌: 최적화 설정 + 수동 계획 ── -->
+  <div>
+    <div class="card" style="padding:10px">
+      <div class="seg" style="width:100%">
+        <button id="tabAuto" class="on" style="flex:1">자동 최적화</button>
+        <button id="tabManual" style="flex:1">내 조합</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>공통 설정</h2>
+      <div class="row">
+        <div><label>체중 (kg)</label><input type="number" id="weight" value="70" min="20" max="200" step="1"></div>
+        <div><label>활동 시작 (시각)</label><input type="time" id="as" value="07:30"></div>
+        <div><label>활동 종료 (시각)</label><input type="time" id="ae" value="09:00"></div>
+      </div>
+    </div>
+
+    <div id="autoPanel">
+      <div class="card">
+        <h2>최적화 조건</h2>
+        <div class="row">
+          <div><label>첫 약물 복용 시각</label><input type="time" id="t0" value="07:00"></div>
+          <div><label>최대 섭취 횟수</label>
+            <select id="maxDose">
+              <option value="1">1회</option>
+              <option value="2">2회</option>
+              <option value="3">3회</option>
+              <option value="4" selected>4회</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div><label>최고−최저 차 · 최대 (ng/mL)</label><input type="number" id="dmax" value="2.0" min="0" max="10" step="0.1"></div>
+        </div>
+        <button class="btn-run" id="findBtn">조합 탐색 실행</button>
+        <div id="recs" style="margin-top:10px"><div class="empty">조건을 설정하고 탐색을 실행하세요.</div></div>
+      </div>
+    </div>
+
+    <div id="manualPanel" style="display:none">
+      <div class="card">
+        <h2>내 조합 — 복용 계획</h2>
+        <div id="plans"></div>
+        <button id="addPlan" style="width:100%;margin-top:4px">+ 약물 추가</button>
+        <div class="empty" style="padding:12px 4px 2px">약물·시각을 설정하면 공통 활동구간(위)의<br>최고 / 최저 / 평균 / 최대 기울기가 우측 그래프에 표시됩니다.</div>
+      </div>
+    </div>
+
+    
+  </div>
+
+  <!-- ── 우: 지표 + 차트 + 표 ── -->
+  <div class="card">
+    <h2>총 혈중농도 (합산, ng/mL)</h2>
+    <div class="stats">
+      <div class="stat"><div class="k">활동구간 최고</div><div class="v num" id="st-hi">—</div><div class="s" id="st-hi-sub"></div></div>
+      <div class="stat"><div class="k">활동구간 최저</div><div class="v num" id="st-lo">—</div><div class="s" id="st-lo-sub"></div></div>
+      <div class="stat"><div class="k">최고 − 최저</div><div class="v num slope" id="st-diff">—</div><div class="s" id="st-diff-sub">조건: —</div></div>
+      <div class="stat"><div class="k">최대 기울기 (총합)</div><div class="v num" id="st-slope">—</div><div class="s">활동구간 내 · ng/mL/분</div></div>
+    </div>
+    <div id="chartbox"><canvas id="cv"></canvas><div id="tip"></div></div>
+    <div class="legend" id="legend"></div>
+</div>
+
+<script>
+/* ── 약동학 모델: focuscurve.app CalculatorPage 파라미터 이식 ── */
+const LN2=Math.log(2);
+function doseResp(amount,F,ka,ke,Vd,t){
+  if(t<=0||amount<=0||Vd<=0||ka<=0||ke<=0||F<=0) return 0;
+  const o=ka-ke; let s;
+  if(Math.abs(o)<1e-6) s=F*amount*ka*t*Math.exp(-ka*t)/Vd;
+  else s=F*amount*ka/(Vd*o)*(Math.exp(-ke*t)-Math.exp(-ka*t));
+  return Math.max(0,s*1000);
+}
+const MPH={F:.22,ka:1.5,ke:LN2/3,vdPerKg:2.65};
+function concAt(type,doseMg,weightKg,doseMin,minute){
+  const{F,ka,ke,vdPerKg}=MPH,Vd=vdPerKg*weightKg,t=(minute-doseMin)/60;
+  if(t<=0) return 0;
+  const half=doseMg*.5; let m=0;
+  if(type==='ir') m=doseResp(half,F,ka,ke,Vd,t);
+  else if(type==='la') m=doseResp(half*.5,F,ka,ke,Vd,t)+(t>4?doseResp(half*.5,F,ka,ke,Vd,t-4):0);
+  else{
+    m=doseResp(half*.22,F,ka,ke,Vd,t);
+    const ph=[1,3,5,7,9],pf=[1,2,3,4,5];
+    for(let k=0;k<5;k++) if(t>ph[k]) m+=doseResp(half*.78*pf[k]/15,F,ka,ke,Vd,t-ph[k]);
+  }
+  return m;
+}
+const SIM=2880;
+const MEDS=[
+ {id:0, name:'콘서타',   dose:18, type:'concerta'},
+ {id:1, name:'콘서타',   dose:27, type:'concerta'},
+ {id:2, name:'콘서타',   dose:36, type:'concerta'},
+ {id:3, name:'콘서타',   dose:45, type:'concerta'},
+ {id:4, name:'콘서타',   dose:54, type:'concerta'},
+ {id:5, name:'페니드',    dose:5,  type:'ir'},
+ {id:6, name:'페니드',    dose:10, type:'ir'},
+ {id:7, name:'메디키넷',  dose:5,  type:'la'},
+ {id:8, name:'메디키넷',  dose:10, type:'la'},
+ {id:9, name:'메디키넷',  dose:20, type:'la'},
+ {id:10,name:'메디키넷',  dose:30, type:'la'},
+ {id:11,name:'메디키넷',  dose:40, type:'la'}
+];
+const COLORS={concerta:'#c9974f',ir:'#7d95c9',la:'#5f9f86'};
+let plans=[],sim=null;
+const $=s=>document.querySelector(s);
+const fmt=m=>{const d=Math.floor(m/1440),h=Math.floor(m%1440/60),mm=m%60;
+  return (h<10?'0':'')+h+':'+(mm<10?'0':'')+mm+(d>0?' +'+d+'일':'');};
+const medOf=id=>MEDS.find(m=>m.id===id);
+const pad2=n=>(n<10?'0':'')+n;
+
+/* ── 수동 계획 UI ── */
+function renderPlans(){
+  const box=$('#plans'); box.innerHTML='';
+  plans.forEach((p,pi)=>{
+    const med=medOf(p.medId),col=COLORS[med.type];
+    let opts='';
+    ['concerta','ir','la'].forEach(t=>{
+      opts+='<optgroup label="'+(t==='concerta'?'콘서타 (OROS)':t==='ir'?'페니드 (즉시방출)':'메디키넷 (2상)')+'">';
+      MEDS.filter(m=>m.type===t).forEach(m=>{
+        opts+='<option value="'+m.id+'"'+(m.id===p.medId?' selected':'')+'>'+m.name+' '+m.dose+'mg</option>';
+      });
+      opts+='</optgroup>';
+    });
+    const chips=p.times.map((t,ti)=>
+      '<span class="time-chip"><input type="time" value="'+t+'" data-p="'+pi+'" data-t="'+ti+'">'+
+      '<button class="rm" data-rm="'+ti+'">×</button></span>').join('');
+    const div=document.createElement('div'); div.className='plan';
+    div.innerHTML='<div class="plan-head"><span class="dot" style="background:'+col+'"></span>'+
+      '<select data-med="'+pi+'" style="flex:1">'+opts+'</select>'+
+      '<button class="btn-del" data-delplan="'+pi+'">✕</button></div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:6px">'+chips+
+      '<button class="add-time" data-addtime="'+pi+'">+ 시각</button></div>';
+    box.appendChild(div);
+  });
+  box.querySelectorAll('select[data-med]').forEach(el=>el.onchange=()=>{plans[+el.dataset.med].medId=+el.value;update();});
+  box.querySelectorAll('input[data-p]').forEach(el=>el.onchange=()=>{plans[+el.dataset.p].times[+el.dataset.t]=el.value||'07:00';update();});
+  box.querySelectorAll('[data-rm]').forEach(el=>el.onclick=()=>{const pi=+el.closest('.time-chip').querySelector('input').dataset.p;
+    if(plans[pi].times.length>1)plans[pi].times.splice(+el.dataset.rm,1);update();});
+  box.querySelectorAll('[data-addtime]').forEach(el=>el.onclick=()=>{plans[+el.dataset.addtime].times.push('12:00');update();});
+  box.querySelectorAll('[data-delplan]').forEach(el=>el.onclick=()=>{plans.splice(+el.dataset.delplan,1);update();});
+}
+
+/* ── 수동 시뮬레이션 ── */
+function simulate(){
+  const w=Math.max(20,Math.min(200,parseFloat($('#weight').value)||70));
+  const evts=[];
+  plans.forEach(p=>p.times.forEach(t=>{
+    const[h,mm]=(t||'07:00').split(':').map(Number);
+    if(!isNaN(h)) evts.push({med:medOf(p.medId),min:Math.min(1439,h*60+(mm||0))});
+  }));
+  evts.sort((a,b)=>a.min-b.min);
+  const total=new Float64Array(SIM+1);
+  const series=evts.map(e=>{
+    const s=new Float64Array(SIM+1);
+    for(let i=Math.max(0,e.min);i<=SIM;i++) s[i]=concAt(e.med.type,e.med.dose,w,e.min,i);
+    for(let i=0;i<=SIM;i++) total[i]+=s[i];
+    return{med:e.med,min:e.min,s};
+  });
+  return{total,series,w};
+}
+
+/* ── 활동구간: 시각 입력 → 절대 분 (자정 넘김 허용) ── */
+function actWindow(){
+  const t0=parseT($('#t0').value);
+  let asAbs=parseT($('#as').value); if(asAbs<=t0) asAbs+=1440;
+  let aeAbs=parseT($('#ae').value); if(aeAbs<=asAbs) aeAbs+=1440;
+  aeAbs=Math.min(aeAbs,asAbs+720);   // 활동구간 최대 12시간
+  return{t0,asAbs,aeAbs,ws:asAbs-t0,we:aeAbs-t0};
+}
+
+/* ── 자동 탐색 (1분 해상도 캐시) ── */
+let ocW=70,ocCache={};
+function oc1(medId,doseMin){                    // 단회차 곡선, 0..1440 1분 해상도
+  const k=medId+'@'+doseMin;
+  if(ocCache[k]) return ocCache[k];
+  const med=medOf(medId),a=new Float64Array(2881);
+  for(let i=doseMin;i<=2880;i++) a[i]=concAt(med.type,med.dose,ocW,doseMin,i);
+  return ocCache[k]=a;
+}
+function poolMeds(){return MEDS.filter(m=>m.type!=='concerta'&&m.dose<=20);}   // 부스터 풀: 페니드/메디키넷 5~20
+
+async function runSearch(){
+  const btn=$('#findBtn'); btn.disabled=true; btn.textContent='탐색 중…';
+  const maxD=+$('#maxDose').value;
+  const{t0,asAbs,aeAbs}=actWindow();
+  const dmax=Math.max(0,+$('#dmax').value||2);
+  ocW=Math.max(20,Math.min(200,parseFloat($('#weight').value)||70)); ocCache={};
+  const pool=poolMeds();
+  const stepEval=(aeAbs-asAbs)>150?2:1;          // 긴 구간은 2분 격자로 1차 평가
+  const top=[],TOPN=10;
+  let count=0;
+  const tick=()=>new Promise(r=>setTimeout(r,0));
+  const prog=txt=>{$('#recs').innerHTML='<div class="empty">'+txt+'</div>';};
+
+  function consider(doses){
+    count++;
+    // 1차: 조기 탈락 — 진행하며 min/max 추적, 차이가 dmax 초과하면 즉시 포기
+    let mn=Infinity,mx=-1;
+    for(let t=asAbs;t<=aeAbs;t+=stepEval){
+      let v=0;
+      for(let j=0;j<doses.length;j++){const abs=t0+doses[j].off;if(t>=abs)v+=oc1(doses[j].med,abs)[t];}
+      if(v<mn)mn=v; if(v>mx)mx=v;
+      if(mx-mn>dmax) return;
+    }
+    // 2차: 통과 후보만 1분 해상도 정밀 계산
+    let mn2=Infinity,mx2=-1,sum=0,n=0,slope=0,prev=-1;
+    for(let t=asAbs;t<=aeAbs;t++){
+      let v=0;
+      for(let j=0;j<doses.length;j++){const abs=t0+doses[j].off;if(t>=abs)v+=oc1(doses[j].med,abs)[t];}
+      if(v<mn2)mn2=v; if(v>mx2)mx2=v; sum+=v;n++;
+      if(prev>=0){const sl=v-prev;if(sl>slope)slope=sl;}
+      prev=v;
+    }
+    const rec={doses:doses.map(d=>({med:d.med,off:d.off})),
+      r:{mn:mn2,mx:mx2,mean:sum/n,diff:mx2-mn2,slope}};
+    const last=top[top.length-1];
+    if(top.length<TOPN||rec.r.mean>last.r.mean){
+      top.push(rec);
+      top.sort((a,b)=>b.r.mean-a.r.mean);
+      if(top.length>TOPN)top.pop();
+    }
+  }
+  const offs=(st,max)=>{const a=[];for(let o=st;o<=max;o+=st)a.push(o);return a;};
+  const o1s=offs(15,660),o2s=offs(30,420),o3s=offs(60,300);
+  const YIELD=0x3fff;
+
+  for(const m of MEDS){
+    consider([{med:m.id,off:0}]);
+    if((count&YIELD)===0){prog('탐색 중… '+count.toLocaleString()+'개 평가'); await tick();}
+  }
+  if(maxD>=2) for(const m of MEDS) for(const b of pool) for(const t2 of o1s){
+    consider([{med:m.id,off:0},{med:b.id,off:t2}]);
+    if((count&YIELD)===0){prog('탐색 중… '+count.toLocaleString()+'개 평가'); await tick();}
+  }
+  if(maxD>=3) for(const m of MEDS) for(const b1 of pool) for(const t2 of o2s)
+    for(const b2 of pool) for(let t3=t2+60;t3<=540;t3+=30){
+      consider([{med:m.id,off:0},{med:b1.id,off:t2},{med:b2.id,off:t3}]);
+      if((count&YIELD)===0){prog('탐색 중… '+count.toLocaleString()+'개 평가'); await tick();}
+    }
+  if(maxD>=4) for(const m of MEDS) for(const b1 of pool) for(const t2 of o3s)
+    for(const b2 of pool) for(let t3=t2+60;t3<=420;t3+=60)
+      for(const b3 of pool) for(let t4=t3+60;t4<=600;t4+=60){
+        consider([{med:m.id,off:0},{med:b1.id,off:t2},{med:b2.id,off:t3},{med:b3.id,off:t4}]);
+        if((count&YIELD)===0){prog('탐색 중… '+count.toLocaleString()+'개 평가'); await tick();}
+      }
+
+  btn.disabled=false; btn.textContent='조합 탐색 실행';
+  top.sort((a,b)=>b.r.mean-a.r.mean);
+  prog('');
+  renderRecs(top,{t0,asAbs,dmax});
+}
+function parseT(v){const[h,m]=(v||'07:00').split(':').map(Number);return(h||7)*60+(m||0);}
+function renderRecs(top,cond){
+  const box=$('#recs');
+  if(!top.length){
+    box.innerHTML='<div class="empty">조건(최고−최저 차 ≤ '+cond.dmax+' ng/mL)을 만족하는<br>조합이 없습니다. 범위를 넓혀보세요.</div>';return;
+  }
+  box.innerHTML='';
+  top.forEach((r,i)=>{
+    const d0=medOf(r.doses[0].med),col=COLORS[d0.type];
+    const name=r.doses.map(d=>{const m=medOf(d.med);return m.name+' '+m.dose+'mg';}).join(' + ');
+    const times=r.doses.map(d=>'+'+d.off+'분('+pad2(Math.floor((cond.t0+d.off)%1440/60))+':'+pad2((cond.t0+d.off)%60)+')').join(' · ');
+    const div=document.createElement('div');div.className='rec'+(i===0?' best':'');
+    div.innerHTML=
+      '<div class="rec-head"><span class="rec-name"><span class="dot" style="display:inline-block;background:'+col+';margin-right:5px"></span>'+name+'</span>'+
+      (i===0?'<span class="badge">BEST FIT</span>':'<span class="badge alt">'+r.doses.length+'회</span>')+'</div>'+
+      '<div class="rec-times">'+times+'</div>'+
+      '<div class="rec-grid">'+
+        '<div><div class="lb">섭취 횟수</div><b>'+r.doses.length+'회</b></div>'+
+        '<div><div class="lb">활동 시작</div><b>'+fmt(cond.asAbs).slice(0,5)+'</b></div>'+
+        '<div><div class="lb">활동 내 최고</div><b class="num">'+r.r.mx.toFixed(2)+'</b></div>'+
+        '<div><div class="lb">활동 내 최저</div><b class="num">'+r.r.mn.toFixed(2)+'</b></div>'+
+        '<div><div class="lb">활동 내 평균</div><b class="num">'+r.r.mean.toFixed(2)+'</b></div>'+
+        '<div><div class="lb">최고−최저</div><b class="num">'+r.r.diff.toFixed(2)+'</b></div>'+
+        '<div><div class="lb">최대 기울기</div><b class="num slope">'+r.r.slope.toFixed(3)+'</b></div>'+
+        '<div style="display:flex;align-items:flex-end;justify-content:flex-end"><button class="btn-apply" data-apply="'+i+'">계획 적용</button></div>'+
+      '</div>';
+    box.appendChild(div);
+  });
+  box.querySelectorAll('[data-apply]').forEach(el=>el.onclick=()=>{
+    const r=top[+el.dataset.apply],byMed={};
+    r.doses.forEach(d=>{(byMed[d.med]=byMed[d.med]||[]).push(cond.t0+d.off);});
+    plans=Object.entries(byMed).map(([med,mins])=>({medId:+med,
+      times:mins.map(m=>pad2(Math.floor(m%1440/60))+':'+pad2(m%60)).sort()}));
+    update();
+  });
+}
+
+/* ── 차트 ── */
+const cv=$('#cv'),ctx=cv.getContext('2d'),tip=$('#tip');
+let actBand=null;
+function draw(){
+  const box=$('#chartbox'),dpr=window.devicePixelRatio||1;
+  cv.width=box.clientWidth*dpr;cv.height=330*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+  const W=box.clientWidth,H=330,padL=40,padR=12,padT=12,padB=26;
+  ctx.clearRect(0,0,W,H);
+  if(!sim||!sim.series.length){
+    ctx.fillStyle='#4c5566';ctx.font='12px monospace';ctx.textAlign='center';
+    ctx.fillText('약물을 추가하거나, 추천 조합을 적용하세요',W/2,H/2);return;
+  }
+  const{asAbs,aeAbs}=actWindow();
+  const bandS=Math.min(asAbs,SIM),bandE=Math.min(aeAbs,SIM);
+  const maxV=Math.max(1,...sim.total),yMax=Math.ceil(maxV*1.1*2)/2;
+  const X=m=>padL+(W-padL-padR)*m/SIM,Yv=v=>H-padB-(H-padT-padB)*v/yMax;
+  // 활동구간 음영
+  if(bandE>bandS){
+    ctx.fillStyle='#ffffff0d';
+    ctx.fillRect(X(bandS),padT,X(bandE)-X(bandS),H-padT-padB);
+    ctx.strokeStyle='#3a3f47';ctx.setLineDash([2,3]);
+    ctx.strokeRect(X(bandS),padT,X(bandE)-X(bandS),H-padT-padB);
+    ctx.setLineDash([]);
+  }
+  ctx.font='10px monospace';
+  ctx.textAlign='right';ctx.textBaseline='middle';
+  for(let v=0;v<=yMax;v+=yMax<=3?.5:1){
+    ctx.strokeStyle='#141a22';ctx.beginPath();ctx.moveTo(padL,Yv(v));ctx.lineTo(W-padR,Yv(v));ctx.stroke();
+    ctx.fillStyle='#4c5566';ctx.fillText(v.toFixed(1),padL-6,Yv(v));
+  }
+  ctx.textAlign='center';ctx.textBaseline='top';
+  const pxPer6h=(W-padL-padR)/(SIM/360);
+  const tickStep=pxPer6h<80?(pxPer6h<50?1440:720):360;
+  for(let m=0;m<=SIM;m+=tickStep){
+    ctx.fillStyle='#4c5566';ctx.fillText(m%1440===0&&m>0?fmt(m):fmt(m).slice(0,5),X(m),H-padB+7);
+    ctx.strokeStyle='#161d26';ctx.beginPath();ctx.moveTo(X(m),padT);ctx.lineTo(X(m),H-padB);ctx.stroke();
+  }
+  sim.series.forEach(s=>{
+    ctx.strokeStyle='#2a3542';ctx.setLineDash([3,4]);
+    ctx.beginPath();ctx.moveTo(X(s.min),padT);ctx.lineTo(X(s.min),H-padB);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle=COLORS[s.med.type];
+    ctx.beginPath();ctx.moveTo(X(s.min),Yv(0)-4);ctx.lineTo(X(s.min)+4,Yv(0));ctx.lineTo(X(s.min),Yv(0)+4);ctx.lineTo(X(s.min)-4,Yv(0));ctx.closePath();ctx.fill();
+  });
+  sim.series.forEach(s=>{
+    ctx.strokeStyle=COLORS[s.med.type];ctx.globalAlpha=.45;ctx.lineWidth=1.2;
+    ctx.beginPath();
+    for(let i=0;i<=SIM;i++){const x=X(i),y=Yv(s.s[i]);i?ctx.lineTo(x,y):ctx.moveTo(x,y);}
+    ctx.stroke();ctx.globalAlpha=1;
+  });
+  ctx.strokeStyle='#f5f7fa';ctx.lineWidth=2;ctx.lineJoin='round';
+  ctx.beginPath();
+  for(let i=0;i<=SIM;i++){const x=X(i),y=Yv(sim.total[i]);i?ctx.lineTo(x,y):ctx.moveTo(x,y);}
+  ctx.stroke();
+  cv._geom={padL,padR,padT,padB};
+}
+cv.addEventListener('mousemove',e=>{
+  if(!sim||!sim.series.length){tip.style.display='none';return;}
+  const r=cv.getBoundingClientRect(),g=cv._geom;
+  const m=Math.round((e.clientX-r.left-g.padL)/(r.width-g.padL-g.padR)*SIM);
+  if(m<0||m>SIM){tip.style.display='none';return;}
+  const Xc=m=>g.padL+(r.width-g.padL-g.padR)*m/SIM;
+  ctx.save();ctx.setTransform(window.devicePixelRatio||1,0,0,window.devicePixelRatio||1,0,0);
+  ctx.strokeStyle='#2a3542';ctx.beginPath();ctx.moveTo(Xc(m),g.padT);ctx.lineTo(Xc(m),330-g.padB);ctx.stroke();ctx.restore();
+  let rows='<b>'+fmt(m)+'</b><br><span style="font-weight:700">총 '+sim.total[m].toFixed(2)+' ng/mL</span>';
+  sim.series.forEach(s=>{if(m>=s.min)rows+='<br><span style="color:'+COLORS[s.med.type]+'">●</span> '+s.med.name+' '+s.med.dose+'mg <span class="num">'+s.s[m].toFixed(2)+'</span>';});
+  tip.innerHTML=rows;tip.style.display='block';
+  const bx=$('#chartbox');
+  tip.style.left=Math.min(Xc(m)+12,bx.clientWidth-165)+'px';tip.style.top='12px';
+});
+cv.addEventListener('mouseleave',()=>{tip.style.display='none';draw();});
+
+/* ── 활동구간 지표 (수동 계획 기준) ── */
+function renderStats(){
+  const t=sim?sim.total:null;
+  const{asAbs,aeAbs}=actWindow();
+  const dmax=Math.max(0,+$('#dmax').value||2);
+  $('#st-diff-sub').textContent='조건: 차 ≤ '+dmax.toFixed(1);
+  if(!t||!sim.series.length){
+    ['st-hi','st-lo','st-diff','st-slope'].forEach(id=>$('#'+id).textContent='—');
+    $('#st-hi-sub').textContent='';$('#st-lo-sub').textContent='';return;
+  }
+  let mn=1e9,mx=0,slope=0;
+  const eW=Math.min(aeAbs,SIM);
+  for(let m=asAbs;m<eW;m++){
+    if(t[m]<mn)mn=t[m]; if(t[m]>mx)mx=t[m];
+    if(m+1<=eW){const sl=t[m+1]-t[m];if(sl>slope)slope=sl;}
+  }
+  $('#st-hi').textContent=mx.toFixed(2);$('#st-hi-sub').textContent='ng/mL @ '+fmt(asAbs).slice(0,5)+'~'+fmt(aeAbs).slice(0,5);
+  $('#st-lo').textContent=mn.toFixed(2);$('#st-lo-sub').textContent='ng/mL';
+  $('#st-diff').textContent=(mx-mn).toFixed(2);
+  $('#st-diff').style.color=(mx-mn)<=dmax?'#fff':'#c05555';
+  $('#st-slope').textContent=slope.toFixed(3);
+  const lg=$('#legend');lg.innerHTML='';
+  const seen=new Set();
+  sim.series.forEach(s=>{const k=s.med.id+'-'+s.min;if(seen.has(k))return;seen.add(k);
+    lg.innerHTML+='<span><i style="background:'+COLORS[s.med.type]+';opacity:.6"></i>'+s.med.name+' '+s.med.dose+'mg <span class="num">@'+fmt(s.min).slice(0,5)+'</span></span>';});
+  lg.innerHTML+='<span><i style="background:#f5f7fa"></i>총 합산</span><span><i style="background:#3a3f47"></i>활동구간</span>';
+}
+function update(){renderPlans();sim=simulate();draw();renderStats();}
+
+$('#addPlan').onclick=()=>{plans.push({medId:0,times:[$('#t0').value||'07:00']});update();};
+$('#weight').oninput=()=>{update();};
+$('#findBtn').onclick=runSearch;
+['t0','as','ae','dmax'].forEach(id=>$('#'+id).oninput=()=>{if(sim&&sim.series.length){draw();renderStats();}});
+window.addEventListener('resize',draw);
+
+
+/* 모드 탭 */
+function setMode(m){
+  $('#tabAuto').classList.toggle('on',m==='auto');
+  $('#tabManual').classList.toggle('on',m==='manual');
+  $('#autoPanel').style.display=m==='auto'?'block':'none';
+  $('#manualPanel').style.display=m==='manual'?'block':'none';
+}
+$('#tabAuto').onclick=()=>setMode('auto');
+$('#tabManual').onclick=()=>setMode('manual');
+
+/* 인트로: 클릭하면 본문 진입 */
+$('#splash').addEventListener('click',()=>{$('#splash').classList.add('out');},{once:true});
+
+/* 초기: 예시 계획 + 초기 탐색 1회 */
+plans=[{medId:2,times:['07:00']},{medId:5,times:['08:00']}];
+update();
+runSearch();
+</script>
+</body>
+</html>
