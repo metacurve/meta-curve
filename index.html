@@ -17,7 +17,6 @@
   .num{font-family:ui-monospace,"SF Mono",Consolas,monospace;font-variant-numeric:tabular-nums}
 
   /* ── intro ── */
-  header h1{cursor:pointer}
   #splash{position:fixed;inset:0;z-index:99;background:#000;cursor:pointer;
     display:flex;align-items:center;justify-content:center;overflow:hidden;transition:opacity .8s}
   #splash.out{opacity:0;pointer-events:none;display:none}
@@ -34,7 +33,7 @@
   }
   /* ── main ── */
   header{max-width:1180px;margin:0 auto;padding:calc(22px + env(safe-area-inset-top,0px)) calc(16px + env(safe-area-inset-left,0px)) 10px;border-bottom:1px solid var(--line)}
-  header h1{font-size:15px;font-weight:700;letter-spacing:.42em;text-transform:uppercase;color:#fff}
+  header h1{cursor:pointer;font-size:15px;font-weight:700;letter-spacing:.42em;text-transform:uppercase;color:#fff}
   .wrap{max-width:1180px;margin:0 auto;padding:16px 16px 46px;display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start}
   @media(max-width:900px){
     .wrap{grid-template-columns:1fr;gap:12px;padding:12px calc(12px + env(safe-area-inset-left,0px)) 40px}
@@ -730,26 +729,27 @@ $('#tabAuto').onclick=()=>setMode('auto');
 $('#tabManual').onclick=()=>setMode('manual');
 $('#tabStock').onclick=()=>setMode('stock');
 
-/* ── 인트로: 단계적 선명화 (선화 → 흑백 → 컬러) ── */
+/* ── 인트로: 단계적 선명화 (선화 → 흑백사진 → 컬러) ── */
 const icv=document.getElementById('introCv');
-let IW=0,IH=0;
-const fitI=()=>{IW=icv.width=innerWidth;IH=icv.height=innerHeight;};
-if(icv)addEventListener('resize',fitI);
+let introRAF=0,introStart=0,introFit=0;
+const IST1=2200,IST2=4600;
 function startIntro(){
-  const sp=$('#splash');
+  if(!icv||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  const sp=document.getElementById('splash');if(!sp)return;
   sp.classList.remove('out');
-  const pf=sp.querySelector('.pill-fly');
-  if(pf){pf.style.animation='none';void pf.offsetWidth;pf.style.animation='';}
-  if(!icv||matchMedia('(prefers-reduced-motion: reduce)').matches){sp.classList.add('out');return;}
-  const ig=icv.getContext('2d');
+  introStart=performance.now();
+  if(introRAF)return;
+  const ig=icv.getContext('2d');let IW,IH;
+  const fitI=()=>{IW=icv.width=innerWidth;IH=icv.height=innerHeight;};
   fitI();
+  if(!introFit){addEventListener('resize',fitI);introFit=1;}
   const N=5,cols=['#f2a65a','#7d95c9','#5f9f86','#e0d0a8','#9db9ff'];
-  const startT=performance.now(),ST1=2200,ST2=4600;
-  const stageNow=()=>{const e=performance.now()-startT;return e<ST1?0:e<ST2?1:2;};
+  const stageNow=()=>{const e=performance.now()-introStart;return e<IST1?0:e<IST2?1:2;};
   (function loop(){
-    if(sp.classList.contains('out'))return;
-    const e=performance.now()-startT,st=stageNow(),prog=Math.min(1,e/ST2*1.15);
+    if(document.getElementById('splash').classList.contains('out')){introRAF=0;return;}
+    const e=performance.now()-introStart,st=stageNow();
     ig.clearRect(0,0,IW,IH);
+    const prog=Math.min(1,e/IST2*1.15);
     for(let i=0;i<N;i++){
       const baseY=IH*.5+(i-(N-1)/2)*Math.min(IH*.13,64);
       const amp=IH*.06+(i%3)*IH*.018;
@@ -767,11 +767,12 @@ function startIntro(){
     }
     if(st===1){ig.fillStyle='rgba(255,255,255,.03)';
       for(let k=0;k<40;k++)ig.fillRect(Math.random()*IW,Math.random()*IH,1.5,1.5);}
-    requestAnimationFrame(loop);
+    introRAF=requestAnimationFrame(loop);
   })();
 }
 $('#splash').addEventListener('click',()=>{$('#splash').classList.add('out');});
 document.querySelector('header h1').addEventListener('click',startIntro);
+
 startIntro();
 
 /* 초기: 예시 계획 + 초기 탐색 1회 */
