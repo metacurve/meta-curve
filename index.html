@@ -77,7 +77,7 @@
     margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
   label{font-size:9.5px;color:var(--mut);display:block;margin:0 0 5px;line-height:1.5;letter-spacing:.16em;text-transform:uppercase;overflow:visible}
   select,input[type=number],input[type=time]{background:#070707;border:1px solid var(--line2);color:var(--txt);
-    border-radius:0;padding:8px 10px;font-size:12.5px;outline:none;width:100%;
+    border-radius:0;padding:8px 10px;font-size:12.5px;outline:none;width:100%;color-scheme:dark;
     height:38px;line-height:1.2;-webkit-appearance:none;appearance:none;box-sizing:border-box}
   select:focus,input:focus{border-color:#fff}
   .row{display:flex;gap:8px;margin-bottom:10px}
@@ -509,7 +509,7 @@ function draw(){
   if(multi){drawDay();return;}
   const box=$('#chartbox'),dpr=window.devicePixelRatio||1;
   cv.width=box.clientWidth*dpr;cv.height=330*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
-  const W=box.clientWidth,H=330,padL=40,padR=12,padT=12,padB=26;
+  const W=box.clientWidth,H=330,padL=40,padR=30,padT=20,padB=26;
   ctx.clearRect(0,0,W,H);
   if(!sim||!sim.series.length){
     ctx.fillStyle='#4c5566';ctx.font='12px monospace';ctx.textAlign='center';
@@ -562,9 +562,9 @@ cv.addEventListener('mousemove',e=>{
   if(multi){
     const r=cv.getBoundingClientRect(),g=cv._day;
     const S=g.S,E=g.E;
-    const m=Math.round(S+(e.clientX-r.left-44)/(r.width-44-12)*(E-S));
+    const m=Math.round(S+(e.clientX-r.left-44)/(r.width-44-30)*(E-S));
     if(m<S||m>E){tip.style.display='none';return;}
-    const Xc=m2=>44+(r.width-44-12)*(m2-S)/(E-S);
+    const Xc=m2=>44+(r.width-44-30)*(m2-S)/(E-S);
     ctx.save();ctx.setTransform(window.devicePixelRatio||1,0,0,window.devicePixelRatio||1,0,0);
     ctx.strokeStyle='#2a303c';ctx.beginPath();ctx.moveTo(Xc(m),12);ctx.lineTo(Xc(m),330-26);ctx.stroke();ctx.restore();
     let rows='<b>'+(activeDay+1)+'일차 '+fmt(m%1440).slice(0,5)+'</b><br><span style="font-weight:600">총 '+multi.total[m].toFixed(2)+' ng/mL</span>';
@@ -598,7 +598,7 @@ cv.addEventListener('mouseleave',()=>{tip.style.display='none';draw();});
 function drawDay(){
   const box=$('#chartbox'),dpr=window.devicePixelRatio||1;
   cv.width=box.clientWidth*dpr;cv.height=330*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
-  const W=box.clientWidth,H=330,padL=44,padR=12,padT=12,padB=26;
+  const W=box.clientWidth,H=330,padL=44,padR=30,padT=20,padB=26;
   ctx.clearRect(0,0,W,H);
   const d=activeDay,S=d*1440,E=Math.min(S+1440,multi.total.length-1);
   let maxV=1;for(let t=S;t<=E;t++)if(multi.total[t]>maxV)maxV=multi.total[t];
