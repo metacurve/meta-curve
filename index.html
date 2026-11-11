@@ -101,6 +101,8 @@
   .rec-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px 10px;font-size:10.5px;color:var(--mut);margin-top:7px}
   .rec-grid b{color:#fff;font-family:ui-monospace,Consolas,monospace;font-variant-numeric:tabular-nums}
   .rec-grid .lb{font-size:8.5px;color:var(--faint);letter-spacing:.14em;text-transform:uppercase;margin-bottom:1px}
+  .daychip{padding:5px 11px;font-size:10.5px;letter-spacing:.08em}
+  .daychip.on{border-color:#fff;color:#fff;background:#0d0d0d;font-weight:600}
   .rec-foot{display:flex;justify-content:space-between;align-items:center;margin-top:7px}
   .rec-times{font-size:10.5px;color:var(--mut)}
   .rec-times b{color:#fff;font-family:ui-monospace,Consolas,monospace}
@@ -170,10 +172,12 @@
     <div id="stockPanel" style="display:none">
       <div class="card">
         <h2>보유 재고 — 종류별 개수</h2>
-        <div id="invGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px"></div>
+        <div id="invList" style="margin-bottom:10px"></div>
+        <button id="addInv" style="width:100%;margin-top:2px">+ 약 추가</button>
         <div class="row">
           <div><label>최적화 기간 (일)</label>
             <select id="stockDays">
+              <option value="1">1일</option>
               <option value="2">2일</option>
               <option value="3" selected>3일</option>
               <option value="4">4일</option>
@@ -216,6 +220,7 @@
   <!-- ── 우: 지표 + 차트 + 표 ── -->
   <div class="card">
     <h2>총 혈중농도 (합산, ng/mL)</h2>
+    <div id="dayNav" style="display:none;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
     <div class="stats">
       <div class="stat"><div class="k">활동구간 최고</div><div class="v num" id="st-hi">—</div><div class="s" id="st-hi-sub"></div></div>
       <div class="stat"><div class="k">활동구간 최저</div><div class="v num" id="st-lo">—</div><div class="s" id="st-lo-sub"></div></div>
@@ -455,6 +460,7 @@ function renderRecs(top,cond){
 const cv=$('#cv'),ctx=cv.getContext('2d'),tip=$('#tip');
 let actBand=null;
 function draw(){
+  if(multi){drawDay();return;}
   const box=$('#chartbox'),dpr=window.devicePixelRatio||1;
   cv.width=box.clientWidth*dpr;cv.height=330*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
   const W=box.clientWidth,H=330,padL=40,padR=12,padT=12,padB=26;
@@ -507,6 +513,25 @@ function draw(){
   cv._geom={padL,padR,padT,padB};
 }
 cv.addEventListener('mousemove',e=>{
+  if(multi){
+    const r=cv.getBoundingClientRect(),g=cv._day;
+    const S=g.S,E=g.E;
+    const m=Math.round(S+(e.clientX-r.left-44)/(r.width-44-12)*(E-S));
+    if(m<S||m>E){tip.style.display='none';return;}
+    const Xc=m2=>44+(r.width-44-12)*(m2-S)/(E-S);
+    ctx.save();ctx.setTransform(window.devicePixelRatio||1,0,0,window.devicePixelRatio||1,0,0);
+    ctx.strokeStyle='#2a303c';ctx.beginPath();ctx.moveTo(Xc(m),12);ctx.lineTo(Xc(m),330-26);ctx.stroke();ctx.restore();
+    let rows='<b>'+(activeDay+1)+'일차 '+fmt(m%1440).slice(0,5)+'</b><br><span style="font-weight:600">총 '+multi.total[m].toFixed(2)+' ng/mL</span>';
+    multi.events.filter(ev=>ev.day<=activeDay&&ev.abs<=m).forEach(ev=>{
+      const md=medOf(ev.medId);
+      let v=0; for(let k=0;k<ev.n;k++) v+=concAt(md.type,md.dose,multi.w,ev.abs,m);
+      rows+='<br><span style="color:'+COLORS[md.type]+'">●</span> '+md.name+' '+md.dose+'mg'+(ev.n>1?' ×'+ev.n:'')+' <span class="num">'+v.toFixed(2)+'</span>';
+    });
+    tip.innerHTML=rows;tip.style.display='block';
+    const bx=$('#chartbox');
+    tip.style.left=Math.min(Xc(m)+12,bx.clientWidth-165)+'px';tip.style.top='12px';
+    return;
+  }
   if(!sim||!sim.series.length){tip.style.display='none';return;}
   const r=cv.getBoundingClientRect(),g=cv._geom;
   const m=Math.round((e.clientX-r.left-g.padL)/(r.width-g.padL-g.padR)*SIM);
@@ -523,7 +548,78 @@ cv.addEventListener('mousemove',e=>{
 cv.addEventListener('mouseleave',()=>{tip.style.display='none';draw();});
 
 /* ── 활동구간 지표 (수동 계획 기준) ── */
+/* ── 멀티데이 일차별 차트 ── */
+function drawDay(){
+  const box=$('#chartbox'),dpr=window.devicePixelRatio||1;
+  cv.width=box.clientWidth*dpr;cv.height=330*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+  const W=box.clientWidth,H=330,padL=44,padR=12,padT=12,padB=26;
+  ctx.clearRect(0,0,W,H);
+  const d=activeDay,S=d*1440,E=Math.min(S+1440,multi.total.length-1);
+  let maxV=1;for(let t=S;t<=E;t++)if(multi.total[t]>maxV)maxV=multi.total[t];
+  const yMax=Math.ceil(maxV*1.1*2)/2;
+  const X=m=>padL+(W-padL-padR)*(m-S)/(E-S),Yv=v=>H-padB-(H-padT-padB)*v/yMax;
+  const asC=parseT($('#as').value),aeC=parseT($('#ae').value);
+  let a1=S+asC,a2=S+aeC; if(a2<=a1)a2+=1440; a2=Math.min(a2,E);
+  if(a2>a1&&a1<E){
+    ctx.fillStyle='#ffffff0d';
+    ctx.fillRect(X(a1),padT,X(a2)-X(a1),H-padT-padB);
+    ctx.strokeStyle='#3a3f47';ctx.setLineDash([2,3]);
+    ctx.strokeRect(X(a1),padT,X(a2)-X(a1),H-padT-padB);
+    ctx.setLineDash([]);
+  }
+  ctx.font='10px ui-monospace,monospace';
+  ctx.textAlign='right';ctx.textBaseline='middle';
+  for(let v=0;v<=yMax;v+=yMax<=3?.5:1){
+    ctx.strokeStyle='#14171d';ctx.beginPath();ctx.moveTo(padL,Yv(v));ctx.lineTo(W-padR,Yv(v));ctx.stroke();
+    ctx.fillStyle='#565b66';ctx.fillText(v.toFixed(1),padL-6,Yv(v));
+  }
+  ctx.textAlign='center';ctx.textBaseline='top';
+  for(let h=0;h<=24;h+=4){
+    const m=S+h*60;
+    ctx.fillStyle='#565b66';ctx.fillText(pad2(h===24?0:h)+':00',X(m),H-padB+7);
+    ctx.strokeStyle='#151920';ctx.beginPath();ctx.moveTo(X(m),padT);ctx.lineTo(X(m),H-padB);ctx.stroke();
+  }
+  multi.events.filter(e=>e.day<=d).forEach(ev=>{
+    const m0=medOf(ev.medId);
+    for(let k=0;k<ev.n;k++){
+      ctx.strokeStyle=COLORS[m0.type];ctx.globalAlpha=.4;ctx.lineWidth=1.1;
+      ctx.beginPath();let st=false;
+      for(let t=Math.max(S,ev.abs);t<=E;t++){
+        const v=concAt(m0.type,m0.dose,multi.w,ev.abs,t);
+        const x=X(t),y=Yv(v); st?ctx.lineTo(x,y):ctx.moveTo(x,y); st=true;
+      }
+      ctx.stroke();ctx.globalAlpha=1;
+    }
+  });
+  ctx.strokeStyle='#f5f7fa';ctx.lineWidth=2;ctx.lineJoin='round';
+  ctx.beginPath();
+  for(let t=S;t<=E;t++){const x=X(t),y=Yv(multi.total[t]);t>S?ctx.lineTo(x,y):ctx.moveTo(x,y);}
+  ctx.stroke();
+  cv._day={S,E};
+}
+
 function renderStats(){
+  if(multi){
+    const asC=parseT($('#as').value),aeC=parseT($('#ae').value);
+    const d=activeDay,S=d*1440,E=Math.min(S+1440,multi.total.length-1);
+    let a1=S+asC,a2=S+aeC; if(a2<=a1)a2+=1440; a2=Math.min(a2,E);
+    let mn=Infinity,mx=0,slope=0;
+    for(let t=a1;t<a2;t++){
+      if(multi.total[t]<mn)mn=multi.total[t]; if(multi.total[t]>mx)mx=multi.total[t];
+      if(t+1<=a2){const sl=multi.total[t+1]-multi.total[t];if(sl>slope)slope=sl;}
+    }
+    const dmax=lastStock?lastStock.cond.dmax:2;
+    $('#st-hi').textContent=mx.toFixed(2);
+    $('#st-hi-sub').textContent='ng/mL @ '+pad2(Math.floor(asC/60))+':'+pad2(asC%60)+'~'+pad2(Math.floor(aeC/60))+':'+pad2(aeC%60)+' · '+(d+1)+'일차';
+    $('#st-lo').textContent=mn.toFixed(2);
+    $('#st-diff').textContent=(mx-mn).toFixed(2);
+    $('#st-diff').style.color=(mx-mn)<=dmax?'#fff':'#c05555';
+    $('#st-slope').textContent=slope.toFixed(3);
+    $('#legend').innerHTML=multi.events.filter(e=>e.day===d).map(e=>
+      '<span><i style="background:'+COLORS[medOf(e.medId).type]+';opacity:.7"></i>'+medOf(e.medId).name+' '+medOf(e.medId).dose+'mg'+(e.n>1?' ×'+e.n:'')+'</span>').join('')+
+      '<span><i style="background:#f5f7fa"></i>총 합산 ('+(d+1)+'일차)</span>';
+    return;
+  }
   const t=sim?sim.total:null;
   const{asAbs,aeAbs}=actWindow();
   const dmax=Math.max(0,+$('#dmax').value||2);
@@ -549,7 +645,7 @@ function renderStats(){
     lg.innerHTML+='<span><i style="background:'+COLORS[s.med.type]+';opacity:.6"></i>'+s.med.name+' '+s.med.dose+'mg <span class="num">@'+fmt(s.min).slice(0,5)+'</span></span>';});
   lg.innerHTML+='<span><i style="background:#f5f7fa"></i>총 합산</span><span><i style="background:#3a3f47"></i>활동구간</span>';
 }
-function update(){renderPlans();sim=simulate();draw();renderStats();}
+function update(){renderPlans();multi=null;dayExpanded=false;renderDayNav();sim=simulate();draw();renderStats();}
 
 $('#addPlan').onclick=()=>{plans.push({medId:0,times:[$('#t0').value||'07:00']});update();};
 $('#weight').oninput=()=>{update();};
@@ -572,13 +668,47 @@ $('#tabManual').onclick=()=>setMode('manual');
 $('#tabStock').onclick=()=>setMode('stock');
 
 /* ── 재고 최적화: 보유 약 종류·개수 → 멀티데이 배분 빔 탐색 ── */
-const invBox=$('#invGrid');
-invBox.innerHTML=MEDS.map(m=>
-  '<div><label style="margin-bottom:3px">'+m.name+' '+m.dose+'mg</label>'+
-  '<input type="number" id="inv-'+m.id+'" value="0" min="0" max="60" step="1"></div>').join('');
-
+let invRows=[], lastStock=null, multi=null, activeDay=0, dayExpanded=false;
+function renderInv(){
+  const box=$('#invList'); box.innerHTML='';
+  invRows.forEach((r,ri)=>{
+    let opts='';
+    ['concerta','ir','la'].forEach(t=>{
+      opts+='<optgroup label="'+(t==='concerta'?'콘서타':t==='ir'?'페니드':'메디키넷')+'">';
+      MEDS.filter(m=>m.type===t).forEach(m=>{
+        opts+='<option value="'+m.id+'"'+(m.id===r.medId?' selected':'')+'>'+m.name+' '+m.dose+'mg</option>';
+      });
+      opts+='</optgroup>';
+    });
+    const div=document.createElement('div');
+    div.style.cssText='display:flex;gap:6px;margin-bottom:6px;align-items:center';
+    div.innerHTML='<select data-im="'+ri+'" style="flex:2">'+opts+'</select>'+
+      '<input type="number" data-ic="'+ri+'" value="'+r.cnt+'" min="1" max="60" style="flex:1" title="개수">'+
+      '<span style="font-size:10px;color:var(--faint);flex:none">개</span>'+
+      '<button class="btn-del" data-idel="'+ri+'">✕</button>';
+    box.appendChild(div);
+  });
+  box.querySelectorAll('select[data-im]').forEach(el=>el.onchange=()=>{invRows[+el.dataset.im].medId=+el.value;});
+  box.querySelectorAll('input[data-ic]').forEach(el=>el.oninput=()=>{invRows[+el.dataset.ic].cnt=Math.max(1,parseInt(el.value)||1);});
+  box.querySelectorAll('[data-idel]').forEach(el=>el.onclick=()=>{invRows.splice(+el.dataset.idel,1);renderInv();});
+}
+$('#addInv').onclick=()=>{invRows.push({medId:0,cnt:1});renderInv();};
 function readStock(){
-  return MEDS.map(m=>({med:m,cnt:Math.max(0,parseInt($('#inv-'+m.id).value)||0)})).filter(x=>x.cnt>0);
+  return invRows.map(r=>({med:medOf(r.medId),cnt:r.cnt})).filter(x=>x.cnt>0);
+}
+function buildMulti(plan,cond){
+  const L=cond.D*1440+60;
+  const w=Math.max(20,Math.min(200,parseFloat($('#weight').value)||70));
+  const total=new Float64Array(L), events=[];
+  plan.forEach(p=>p.events.forEach(e=>{
+    events.push({day:p.day,medId:e.med,n:e.n,off:e.off,abs:p.day*1440+cond.t0+e.off});
+  }));
+  events.forEach(ev=>{
+    const m=medOf(ev.medId);
+    for(let k=0;k<ev.n;k++)
+      for(let t=Math.max(0,ev.abs);t<L;t++) total[t]+=concAt(m.type,m.dose,w,ev.abs,t);
+  });
+  return{total,D:cond.D,events,w};
 }
 function dayCandidates(stock,maxD){
   const S=stock.map(x=>x.med.id);
@@ -683,6 +813,7 @@ async function runStockSearch(){
 }
 function renderStockRecs(beams,cond){
   const box=$('#stockRecs'); box.innerHTML='';
+  lastStock={beams,cond};
   beams.forEach((r,i)=>{
     const sched=r.plan.map(p=>{
       const d=p.day+1;
@@ -699,21 +830,34 @@ function renderStockRecs(beams,cond){
       '<div class="rec-times">'+sched+'</div>'+
       '<div class="rec-grid" style="grid-template-columns:repeat(2,1fr);margin-top:7px">'+
         '<div><div class="lb">활동시간 평균 (일평균)</div><b class="num">'+mean+' ng/mL</b></div>'+
-        '<div style="text-align:right"><button class="btn-apply" data-sapply="'+i+'">1일차 계획 적용</button></div>'+
+        '<div style="text-align:right"><button class="btn-apply" data-sapply="'+i+'">계획 적용</button></div>'+
       '</div>';
     box.appendChild(div);
   });
   box.querySelectorAll('[data-sapply]').forEach(el=>el.onclick=()=>{
-    const r=beams[+el.dataset.sapply],d1=r.plan[0].events,byMed={};
-    d1.forEach(e=>{
-      const min=cond.t0+e.off;
-      for(let k=0;k<e.n;k++) (byMed[e.med]=byMed[e.med]||[]).push(min);
-    });
-    plans=Object.entries(byMed).map(([med,mins])=>({medId:+med,
-      times:mins.map(m=>pad2(Math.floor(m%1440/60))+':'+pad2(m%60)).sort()}));
-    setMode('manual');
-    update();
+    multi=buildMulti(beams[+el.dataset.sapply].plan,cond);
+    activeDay=0; dayExpanded=false;
+    renderDayNav(); draw(); renderStats();
   });
+}
+function renderDayNav(){
+  const nav=$('#dayNav');
+  if(!multi||multi.D<2){nav.style.display='none';return;}
+  nav.style.display='flex';
+  let html='';
+  if(!dayExpanded){
+    html='<button class="daychip on" id="dayLabel">'+(activeDay+1)+'일차</button>'+
+         '<button id="dayArrow" title="일차 펼치기" style="padding:5px 9px">▸</button>';
+  }else{
+    for(let d=0;d<multi.D;d++)
+      html+='<button class="daychip'+(d===activeDay?' on':'')+'" data-day="'+d+'">'+(d+1)+'일차</button>';
+    html+='<button id="dayArrow" title="접기" style="padding:5px 9px">◂</button>';
+  }
+  nav.innerHTML=html;
+  $('#dayArrow').onclick=()=>{dayExpanded=!dayExpanded;renderDayNav();};
+  const dl=$('#dayLabel'); if(dl)dl.onclick=()=>{dayExpanded=!dayExpanded;renderDayNav();};
+  nav.querySelectorAll('[data-day]').forEach(el=>el.onclick=()=>{
+    activeDay=+el.dataset.day; renderDayNav(); draw(); renderStats();});
 }
 $('#stockBtn').onclick=runStockSearch;
 $('#stockDmax').oninput=()=>{};
