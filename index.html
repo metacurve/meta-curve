@@ -20,17 +20,22 @@
   #splash{position:fixed;inset:0;z-index:99;background:#000;cursor:pointer;
     display:flex;align-items:center;justify-content:center;overflow:hidden;transition:opacity .8s}
   #splash.out{opacity:0;pointer-events:none;display:none}
-  #introCv{position:absolute;inset:0;width:100%;height:100%}
-  .intro-title{position:absolute;top:calc(54px + env(safe-area-inset-top,0px));left:0;right:0;text-align:center;
-    color:#fff;font-size:14px;font-weight:600;letter-spacing:.5em;text-transform:uppercase;z-index:3}
-  .pill-fly{position:absolute;left:50%;top:50%;width:60px;height:22px;border-radius:11px;background:#fff;z-index:2;
-    opacity:0;animation:fly 6.5s cubic-bezier(.3,.5,.4,1) 2.2s forwards}
-  @keyframes fly{
-    0%{opacity:0;transform:translate(-50%,-50%) scale(.6)}
-    10%{opacity:1;transform:translate(-50%,-50%) scale(1)}
-    45%{transform:translate(120%,-50%) scale(1)}
-    100%{opacity:0;transform:translate(-220%,-50%) scale(.8)}
+  .pill-stage{position:relative;width:340px;height:200px;display:flex;align-items:center;justify-content:center}
+  .pill{width:74px;height:26px;border-radius:13px;background:#fff;position:relative;z-index:3;
+    box-shadow:0 0 24px #ffffff44;animation:pillSeq 4.6s cubic-bezier(.2,.7,.3,1) .3s forwards}
+  @keyframes pillSeq{
+    0%{transform:scale(0);opacity:0}
+    22%{transform:scale(1);opacity:1}
+    48%{transform:scale(1)}
+    100%{transform:scaleX(16) scaleY(.55);opacity:.85}
   }
+  .glow{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:74px;height:26px;border-radius:13px;
+    background:#fff;filter:blur(18px);opacity:0;z-index:1;animation:glowUp 4.6s ease .3s forwards}
+  @keyframes glowUp{0%{opacity:0}30%{opacity:.45}100%{opacity:.85}}
+  #splash h1{position:absolute;top:60px;left:0;right:0;text-align:center;color:#fff;font-size:15px;
+    font-weight:600;letter-spacing:.5em;text-transform:uppercase}
+  @keyframes blink{0%,100%{opacity:.2}50%{opacity:.8}}
+
   /* ── main ── */
   header{max-width:1180px;margin:0 auto;padding:calc(22px + env(safe-area-inset-top,0px)) calc(16px + env(safe-area-inset-left,0px)) 10px;border-bottom:1px solid var(--line)}
   header h1{cursor:pointer;font-size:15px;font-weight:700;letter-spacing:.42em;text-transform:uppercase;color:#fff}
@@ -142,9 +147,11 @@
 
 <!-- ── 인트로: 검은 바탕, 흰 알약이 옆으로 퍼짐, 클릭하면 진입 ── -->
 <div id="splash">
-  <canvas id="introCv"></canvas>
-  <div class="intro-title">META CURVE</div>
-  <div class="pill-fly"></div>
+  <h1>META CURVE</h1>
+  <div class="pill-stage">
+    <div class="glow"></div>
+    <div class="pill"></div>
+  </div>
 </div>
 
 <header>
@@ -500,29 +507,11 @@ function renderRecs(top,cond){
   });
 }
 
-/* ── 일차 내비게이션 (재고 다중일) ── */
-let activeDay=0;
-function renderDayNav(){
-  const nav=$('#dayNav');
-  if(!multi){nav.style.display='none';nav.innerHTML='';return;}
-  const days=Math.floor((multi.total.length-1)/1440);
-  if(activeDay>=days)activeDay=0;
-  nav.style.display='flex';
-  nav.innerHTML='';
-  for(let d=0;d<days;d++){
-    const b=document.createElement('button');
-    b.textContent=(d+1)+'일차';
-    if(d===activeDay)b.classList.add('on');
-    b.onclick=()=>{activeDay=d;renderDayNav();draw();renderStats();};
-    nav.appendChild(b);
-  }
-}
-
 /* ── 차트 ── */
 const cv=$('#cv'),ctx=cv.getContext('2d'),tip=$('#tip');
 let actBand=null;
 function draw(){
-  if(multi){renderDayNav();drawDay();return;}
+  if(multi){drawDay();return;}
   const box=$('#chartbox'),dpr=window.devicePixelRatio||1;
   cv.width=box.clientWidth*dpr;cv.height=330*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
   const W=box.clientWidth,H=330,padL=40,padR=30,padT=20,padB=26;
@@ -729,51 +718,208 @@ $('#tabAuto').onclick=()=>setMode('auto');
 $('#tabManual').onclick=()=>setMode('manual');
 $('#tabStock').onclick=()=>setMode('stock');
 
-/* ── 인트로: 단계적 선명화 (선화 → 흑백사진 → 컬러) ── */
-const icv=document.getElementById('introCv');
-let introRAF=0,introStart=0,introFit=0;
-const IST1=2200,IST2=4600;
-function startIntro(){
-  if(!icv||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-  const sp=document.getElementById('splash');if(!sp)return;
-  sp.classList.remove('out');
-  introStart=performance.now();
-  if(introRAF)return;
-  const ig=icv.getContext('2d');let IW,IH;
-  const fitI=()=>{IW=icv.width=innerWidth;IH=icv.height=innerHeight;};
-  fitI();
-  if(!introFit){addEventListener('resize',fitI);introFit=1;}
-  const N=5,cols=['#f2a65a','#7d95c9','#5f9f86','#e0d0a8','#9db9ff'];
-  const stageNow=()=>{const e=performance.now()-introStart;return e<IST1?0:e<IST2?1:2;};
-  (function loop(){
-    if(document.getElementById('splash').classList.contains('out')){introRAF=0;return;}
-    const e=performance.now()-introStart,st=stageNow();
-    ig.clearRect(0,0,IW,IH);
-    const prog=Math.min(1,e/IST2*1.15);
-    for(let i=0;i<N;i++){
-      const baseY=IH*.5+(i-(N-1)/2)*Math.min(IH*.13,64);
-      const amp=IH*.06+(i%3)*IH*.018;
-      const speed=.00035+i*.00007;
-      ig.beginPath();
-      for(let x=0;x<=IW;x+=6){
-        const y=baseY+Math.sin(x*.006+e*speed*2+i*1.7)*amp+Math.sin(x*.0013-e*speed+i)*amp*.6;
-        x?ig.lineTo(x,y):ig.moveTo(x,y);
-      }
-      if(st===0){ig.strokeStyle='rgba(255,255,255,'+(.10+prog*.08)+')';ig.lineWidth=1;}
-      else if(st===1){const g=140+prog*60|0;
-        ig.strokeStyle='rgba('+g+','+g+','+g+','+(.35+prog*.25)+')';ig.lineWidth=1.4+prog*.8;}
-      else{ig.strokeStyle=cols[i%5];ig.globalAlpha=.55+prog*.4;ig.lineWidth=2+prog*1.2;}
-      ig.stroke();ig.globalAlpha=1;
-    }
-    if(st===1){ig.fillStyle='rgba(255,255,255,.03)';
-      for(let k=0;k<40;k++)ig.fillRect(Math.random()*IW,Math.random()*IH,1.5,1.5);}
-    introRAF=requestAnimationFrame(loop);
-  })();
+/* ── 재고 최적화: 보유 약 종류·개수 → 멀티데이 배분 빔 탐색 ── */
+let invRows=[], lastStock=null, multi=null, activeDay=0, dayExpanded=false;
+function renderInv(){
+  const box=$('#invList'); box.innerHTML='';
+  invRows.forEach((r,ri)=>{
+    let opts='';
+    ['concerta','ir','la'].forEach(t=>{
+      opts+='<optgroup label="'+(t==='concerta'?'콘서타':t==='ir'?'페니드':'메디키넷')+'">';
+      MEDS.filter(m=>m.type===t).forEach(m=>{
+        opts+='<option value="'+m.id+'"'+(m.id===r.medId?' selected':'')+'>'+m.name+' '+m.dose+'mg</option>';
+      });
+      opts+='</optgroup>';
+    });
+    const div=document.createElement('div');
+    div.style.cssText='display:flex;gap:6px;margin-bottom:6px;align-items:center';
+    div.innerHTML='<span class="dot" style="background:'+COLORS[medOf(r.medId).type]+';flex:none"></span>'+
+      '<select data-im="'+ri+'" style="flex:2">'+opts+'</select>'+
+      '<input type="number" data-ic="'+ri+'" value="'+r.cnt+'" min="1" max="60" style="flex:1" title="개수">'+
+      '<span style="font-size:10px;color:var(--faint);flex:none">개</span>'+
+      '<button class="btn-del" data-idel="'+ri+'">✕</button>';
+    box.appendChild(div);
+  });
+  box.querySelectorAll('select[data-im]').forEach(el=>el.onchange=()=>{
+    invRows[+el.dataset.im].medId=+el.value;
+    el.closest('div').querySelector('.dot').style.background=COLORS[medOf(+el.value).type];});
+  box.querySelectorAll('input[data-ic]').forEach(el=>el.oninput=()=>{invRows[+el.dataset.ic].cnt=Math.max(1,parseInt(el.value)||1);});
+  box.querySelectorAll('[data-idel]').forEach(el=>el.onclick=()=>{invRows.splice(+el.dataset.idel,1);renderInv();});
 }
-$('#splash').addEventListener('click',()=>{$('#splash').classList.add('out');});
-document.querySelector('header h1').addEventListener('click',startIntro);
+$('#addInv').onclick=()=>{invRows.push({medId:0,cnt:1});renderInv();};
+function readStock(){
+  return invRows.map(r=>({med:medOf(r.medId),cnt:r.cnt})).filter(x=>x.cnt>0);
+}
+function buildMulti(plan,cond){
+  const L=cond.D*1440+60;
+  const w=Math.max(20,Math.min(200,parseFloat($('#weight').value)||70));
+  const total=new Float64Array(L), events=[];
+  plan.forEach(p=>p.events.forEach(e=>{
+    events.push({day:p.day,medId:e.med,n:e.n,off:e.off,abs:p.day*1440+cond.t0+e.off});
+  }));
+  events.forEach(ev=>{
+    const m=medOf(ev.medId);
+    for(let k=0;k<ev.n;k++)
+      for(let t=Math.max(0,ev.abs);t<L;t++) total[t]+=concAt(m.type,m.dose,w,ev.abs,t);
+  });
+  return{total,D:cond.D,events,w};
+}
+function dayCandidates(stock,maxD){
+  const S=stock.map(x=>x.med.id);
+  const ev1s=[];
+  for(const x of stock){ ev1s.push([{med:x.med.id,n:1}]); if(x.cnt>=2) ev1s.push([{med:x.med.id,n:2}]); }
+  for(let i=0;i<stock.length;i++) for(let j=i+1;j<stock.length;j++)
+    ev1s.push([{med:stock[i].med.id,n:1},{med:stock[j].med.id,n:1}]);
+  const cands=ev1s.map(e=>e.slice());
+  if(maxD>=2){
+    for(const e of ev1s) for(const sd of S) for(let o2=30;o2<=600;o2+=30)
+      cands.push([...e,{med:sd,n:1,off:o2}]);
+  }
+  if(maxD>=3){
+    for(const e of ev1s) for(const s2 of S) for(let o2=60;o2<=420;o2+=60)
+      for(const s3 of S) for(let o3=o2+60;o3<=540;o3+=60)
+        cands.push([...e,{med:s2,n:1,off:o2},{med:s3,n:1,off:o3}]);
+  }
+  if(maxD>=4&&S.length<=4){
+    for(const e of ev1s.slice(0,24)) for(const s2 of S) for(let o2=60;o2<=300;o2+=60)
+      for(const s3 of S) for(let o3=o2+60;o3<=420;o3+=60)
+        for(const s4 of S) for(let o4=o3+60;o4<=600;o4+=60)
+          cands.push([...e,{med:s2,n:1,off:o2},{med:s3,n:1,off:o3},{med:s4,n:1,off:o4}]);
+  }
+  if(cands.length>16000){
+    const out=[],st=cands.length/16000;
+    for(let i=0;i<16000;i++) out.push(cands[Math.floor(i*st)]);
+    return out;
+  }
+  return cands;
+}
+function stockWindow(d,asC,aeC){
+  let ws=d*1440+asC, we=d*1440+aeC;
+  if(we<=ws) we+=1440;
+  we=Math.min(we,ws+720);
+  return{ws,we};
+}
+async function runStockSearch(){
+  const btn=$('#stockBtn'); btn.disabled=true; btn.textContent='탐색 중';
+  const stock=readStock();
+  const box=$('#stockRecs');
+  if(!stock.length){box.innerHTML='<div class="empty">보유 약을 1개 이상 입력하세요.</div>';btn.disabled=false;btn.textContent='재고 탐색 실행';return;}
+  const D=+$('#stockDays').value, maxD=+$('#stockMaxDose').value;
+  const t0=parseT($('#stockT0').value);
+  const dmax=Math.max(0,+$('#stockDmax').value||2);
+  const asC=parseT($('#as').value), aeC=parseT($('#ae').value);
+  ocW=Math.max(20,Math.min(200,parseFloat($('#weight').value)||70)); ocCache={};
+  const L=D*1440+720;
+  const cands=dayCandidates(stock,maxD);
+  const stepEval=(aeC-asC)>150?2:1;
+  const BEAM=10;
+  let beams=[{total:new Float64Array(L),used:stock.map(x=>({id:x.med.id,left:x.cnt})),meanSum:0,plan:[]}];
+  const tick=()=>new Promise(r=>setTimeout(r,0));
+  let evals=0;
+  const prog=t=>{$('#stockRecs').innerHTML='<div class="empty">'+t+'</div>';};
 
-startIntro();
+  for(let d=0;d<D;d++){
+    const dayStart=d*1440+t0;
+    const{ws,we}=stockWindow(d,asC,aeC);
+    const next=[];
+    for(let bi=0;bi<beams.length;bi++){
+      const b=beams[bi];
+      for(const cand of cands){
+        // 재고 확인
+        const need={};
+        let ok=true;
+        for(const e of cand){const n=e.n||1;need[e.med]=(need[e.med]||0)+n;}
+        for(const k in need){const u=b.used.find(u=>u.id==k);if(!u||u.left<need[k]){ok=false;break;}}
+        if(!ok) continue;
+        // 곡선 합산 + 활동구간 평가
+        const tot=b.total.slice();
+        for(const e of cand){
+          const arr=oc1(e.med,dayStart+(e.off||0));
+          for(let t=dayStart+(e.off||0);t<L;t++) tot[t]+=arr[t];
+        }
+        let mn=Infinity,mx=-1,sum=0,n=0,slope=0,prev=-1;
+        for(let t=ws;t<=we;t+=stepEval){
+          if(tot[t]<mn)mn=tot[t]; if(tot[t]>mx)mx=tot[t]; sum+=tot[t];n++;
+          if(prev>=0){const sl=tot[t]-prev;if(sl>slope)slope=sl;}
+          prev=tot[t];
+        }
+        evals++;
+        if(mx-mn>dmax) continue;
+        if(stepEval>1){ mn=Infinity;mx=-1;prev=-1;
+          for(let t=ws;t<=we;t++){ if(tot[t]<mn)mn=tot[t]; if(tot[t]>mx)mx=tot[t];
+            if(prev>=0){const sl=tot[t]-prev;if(sl>slope)slope=sl;} prev=tot[t]; } }
+        // 활동시간 이후(~익일 활동시작 전) 피크가 금일 활동구간 피크 이상이면 탈락
+        let postMx=-1;
+        const postEnd=Math.min(d*1440+t0+1440,L);
+        for(let t=we+1;t<postEnd;t++){ if(tot[t]>postMx)postMx=tot[t]; }
+        if(postMx>=mx) continue;
+        next.push({total:tot,
+          used:b.used.map(u=>({id:u.id,left:u.left-(need[u.id]||0)})),
+          meanSum:b.meanSum+sum/n,
+          plan:b.plan.concat([{day:d,events:cand.map(e=>({med:e.med,n:e.n||1,off:e.off||0}))}])});
+      }
+      if((evals&0x1fff)===0){prog('탐색 중… '+d+'일차 '+evals.toLocaleString()+' 평가'); await tick();}
+    }
+    next.sort((a,b)=>b.meanSum-a.meanSum);
+    beams=next.slice(0,BEAM);
+    if(!beams.length){break;}
+  }
+  btn.disabled=false; btn.textContent='재고 탐색 실행';
+  if(!beams.length){
+    box.innerHTML='<div class="empty">재고로는 '+D+'일간 조건(차 ≤ '+dmax.toFixed(1)+' ng/mL)을<br>만족할 수 없습니다. 기간을 줄이거나 재고를 늘려보세요.</div>';return;
+  }
+  renderStockRecs(beams,{D,dmax,asC,aeC,t0});
+}
+function renderStockRecs(beams,cond){
+  const box=$('#stockRecs'); box.innerHTML='';
+  lastStock={beams,cond};
+  beams.forEach((r,i)=>{
+    const sched=r.plan.map(p=>{
+      const d=p.day+1;
+      const ev=p.events.map(e=>{const m=medOf(e.med);
+        return m.name+' '+m.dose+'mg'+(e.n>1?' ×'+e.n:'')+' @'+pad2(Math.floor((cond.t0+e.off)%1440/60))+':'+pad2((cond.t0+e.off)%60);
+      }).join(' + ');
+      return '<b>'+d+'일차</b> '+ev;
+    }).join('<br>');
+    const mean=(r.meanSum/cond.D).toFixed(2);
+    const div=document.createElement('div'); div.className='rec'+(i===0?' best':'');
+    div.innerHTML=
+      '<div class="rec-head"><span class="rec-name">'+(i===0?'BEST FIT':'#'+(i+1))+'</span>'+
+      '<span class="badge">'+cond.D+'일</span></div>'+
+      '<div class="rec-times">'+sched+'</div>'+
+      '<div class="rec-grid" style="grid-template-columns:repeat(2,1fr);margin-top:7px">'+
+        '<div><div class="lb">활동시간 평균 (일평균)</div><b class="num">'+mean+' ng/mL</b></div>'+
+        '<div style="text-align:right"><button class="btn-apply" data-sapply="'+i+'">계획 적용</button></div>'+
+      '</div>';
+    box.appendChild(div);
+  });
+  box.querySelectorAll('[data-sapply]').forEach(el=>el.onclick=()=>{
+    multi=buildMulti(beams[+el.dataset.sapply].plan,cond);
+    activeDay=0;
+    renderDayNav(); draw(); renderStats();
+  });
+}
+function renderDayNav(){
+  const nav=$('#dayNav');
+  if(!multi||multi.D<2){nav.style.display='none';return;}
+  nav.style.display='flex';
+  let html='';
+  for(let d=0;d<multi.D;d++)
+    html+='<button class="daychip'+(d===activeDay?' on':'')+'" data-day="'+d+'">'+(d+1)+'일차</button>';
+  nav.innerHTML=html;
+  nav.querySelectorAll('[data-day]').forEach(el=>el.onclick=()=>{
+    activeDay=+el.dataset.day; renderDayNav(); draw(); renderStats();});
+}
+$('#stockBtn').onclick=runStockSearch;
+$('#stockDmax').oninput=()=>{};
+
+/* 인트로: 클릭하면 본문 진입 */
+$('#splash').addEventListener('click',()=>{$('#splash').classList.add('out');});
+document.querySelector('header h1').addEventListener('click',()=>{
+  const sp=$('#splash'),pill=sp.querySelector('.pill');
+  sp.classList.remove('out');
+  if(pill){const n=pill.cloneNode(true);pill.parentNode.replaceChild(n,pill);}
+});
 
 /* 초기: 예시 계획 + 초기 탐색 1회 */
 plans=[{medId:2,times:['07:00']},{medId:5,times:['08:00']}];
