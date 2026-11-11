@@ -426,6 +426,14 @@ async function runSearch(){
       if(prev>=0){const sl=v-prev;if(sl>slope)slope=sl;}
       prev=v;
     }
+    // 활동구간 이후(종료~+24h) 피크가 활동구간 피크 이상이면 탈락
+    let postMx=-1;
+    for(let t=aeAbs+1;t<aeAbs+1440&&t<2880;t++){
+      let v=0;
+      for(let j=0;j<doses.length;j++){const abs=t0+doses[j].off;if(t>=abs)v+=oc1(doses[j].med,abs)[t];}
+      if(v>postMx)postMx=v;
+    }
+    if(postMx>=mx2) return;
     const rec={doses:doses.map(d=>({med:d.med,off:d.off})),
       r:{mn:mn2,mx:mx2,mean:sum/n,diff:mx2-mn2,slope}};
     const last=top[top.length-1];
@@ -843,6 +851,11 @@ async function runStockSearch(){
         if(stepEval>1){ mn=Infinity;mx=-1;prev=-1;
           for(let t=ws;t<=we;t++){ if(tot[t]<mn)mn=tot[t]; if(tot[t]>mx)mx=tot[t];
             if(prev>=0){const sl=tot[t]-prev;if(sl>slope)slope=sl;} prev=tot[t]; } }
+        // 활동시간 이후(~익일 활동시작 전) 피크가 금일 활동구간 피크 이상이면 탈락
+        let postMx=-1;
+        const postEnd=Math.min(d*1440+t0+1440,L);
+        for(let t=we+1;t<postEnd;t++){ if(tot[t]>postMx)postMx=tot[t]; }
+        if(postMx>=mx) continue;
         next.push({total:tot,
           used:b.used.map(u=>({id:u.id,left:u.left-(need[u.id]||0)})),
           meanSum:b.meanSum+sum/n,
