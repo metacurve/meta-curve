@@ -132,6 +132,7 @@
       <div class="seg" style="width:100%">
         <button id="tabAuto" class="on" style="flex:1">자동 최적화</button>
         <button id="tabManual" style="flex:1">내 조합</button>
+        <button id="tabStock" style="flex:1">재고 최적화</button>
       </div>
     </div>
 
@@ -163,6 +164,40 @@
         </div>
         <button class="btn-run" id="findBtn">조합 탐색 실행</button>
         <div id="recs" style="margin-top:10px"><div class="empty">조건을 설정하고 탐색을 실행하세요.</div></div>
+      </div>
+    </div>
+
+    <div id="stockPanel" style="display:none">
+      <div class="card">
+        <h2>보유 재고 — 종류별 개수</h2>
+        <div id="invGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px"></div>
+        <div class="row">
+          <div><label>최적화 기간 (일)</label>
+            <select id="stockDays">
+              <option value="2">2일</option>
+              <option value="3" selected>3일</option>
+              <option value="4">4일</option>
+              <option value="5">5일</option>
+              <option value="6">6일</option>
+              <option value="7">7일</option>
+            </select>
+          </div>
+          <div><label>하루 최대 복용 횟수</label>
+            <select id="stockMaxDose">
+              <option value="1">1회</option>
+              <option value="2">2회</option>
+              <option value="3">3회</option>
+              <option value="4" selected>4회</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div><label>첫 복용 시각 (매일 동일)</label><input type="time" id="stockT0" value="07:00"></div>
+          <div><label>최고−최저 차 · 최대 (ng/mL)</label><input type="number" id="stockDmax" value="2.0" min="0" max="10" step="0.1"></div>
+        </div>
+        <button class="btn-run" id="stockBtn">재고 탐색 실행</button>
+        <div id="stockRecs" style="margin-top:12px"><div class="empty">보유한 약의 개수를 입력하고 탐색을 실행하세요.<br>같은 시각에 2정 복용도 허용되며,<br>남는 재고가 있어도 괜찮습니다.</div></div>
+        <div class="empty" style="padding:10px 2px 0;font-size:10.5px">활동구간·체중은 공통 설정을 따릅니다 · 정렬: 활동시간 내 평균 높은 순</div>
       </div>
     </div>
 
@@ -303,8 +338,8 @@ let ocW=70,ocCache={};
 function oc1(medId,doseMin){                    // 단회차 곡선, 0..1440 1분 해상도
   const k=medId+'@'+doseMin;
   if(ocCache[k]) return ocCache[k];
-  const med=medOf(medId),a=new Float64Array(2881);
-  for(let i=doseMin;i<=2880;i++) a[i]=concAt(med.type,med.dose,ocW,doseMin,i);
+  const med=medOf(medId),a=new Float64Array(4322);
+  for(let i=doseMin;i<4322;i++) a[i]=concAt(med.type,med.dose,ocW,doseMin,i);
   return ocCache[k]=a;
 }
 function poolMeds(){return MEDS.filter(m=>m.type!=='concerta'&&m.dose<=20);}   // 부스터 풀: 페니드/메디키넷 5~20
@@ -527,11 +562,161 @@ window.addEventListener('resize',draw);
 function setMode(m){
   $('#tabAuto').classList.toggle('on',m==='auto');
   $('#tabManual').classList.toggle('on',m==='manual');
+  $('#tabStock').classList.toggle('on',m==='stock');
   $('#autoPanel').style.display=m==='auto'?'block':'none';
   $('#manualPanel').style.display=m==='manual'?'block':'none';
+  $('#stockPanel').style.display=m==='stock'?'block':'none';
 }
 $('#tabAuto').onclick=()=>setMode('auto');
 $('#tabManual').onclick=()=>setMode('manual');
+$('#tabStock').onclick=()=>setMode('stock');
+
+/* ── 재고 최적화: 보유 약 종류·개수 → 멀티데이 배분 빔 탐색 ── */
+const invBox=$('#invGrid');
+invBox.innerHTML=MEDS.map(m=>
+  '<div><label style="margin-bottom:3px">'+m.name+' '+m.dose+'mg</label>'+
+  '<input type="number" id="inv-'+m.id+'" value="0" min="0" max="60" step="1"></div>').join('');
+
+function readStock(){
+  return MEDS.map(m=>({med:m,cnt:Math.max(0,parseInt($('#inv-'+m.id).value)||0)})).filter(x=>x.cnt>0);
+}
+function dayCandidates(stock,maxD){
+  const S=stock.map(x=>x.med.id);
+  const ev1s=[];
+  for(const x of stock){ ev1s.push([{med:x.med.id,n:1}]); if(x.cnt>=2) ev1s.push([{med:x.med.id,n:2}]); }
+  for(let i=0;i<stock.length;i++) for(let j=i+1;j<stock.length;j++)
+    ev1s.push([{med:stock[i].med.id,n:1},{med:stock[j].med.id,n:1}]);
+  const cands=ev1s.map(e=>e.slice());
+  if(maxD>=2){
+    for(const e of ev1s) for(const sd of S) for(let o2=30;o2<=600;o2+=30)
+      cands.push([...e,{med:sd,n:1,off:o2}]);
+  }
+  if(maxD>=3){
+    for(const e of ev1s) for(const s2 of S) for(let o2=60;o2<=420;o2+=60)
+      for(const s3 of S) for(let o3=o2+60;o3<=540;o3+=60)
+        cands.push([...e,{med:s2,n:1,off:o2},{med:s3,n:1,off:o3}]);
+  }
+  if(maxD>=4&&S.length<=4){
+    for(const e of ev1s.slice(0,24)) for(const s2 of S) for(let o2=60;o2<=300;o2+=60)
+      for(const s3 of S) for(let o3=o2+60;o3<=420;o3+=60)
+        for(const s4 of S) for(let o4=o3+60;o4<=600;o4+=60)
+          cands.push([...e,{med:s2,n:1,off:o2},{med:s3,n:1,off:o3},{med:s4,n:1,off:o4}]);
+  }
+  if(cands.length>16000){
+    const out=[],st=cands.length/16000;
+    for(let i=0;i<16000;i++) out.push(cands[Math.floor(i*st)]);
+    return out;
+  }
+  return cands;
+}
+function stockWindow(d,asC,aeC){
+  let ws=d*1440+asC, we=d*1440+aeC;
+  if(we<=ws) we+=1440;
+  we=Math.min(we,ws+720);
+  return{ws,we};
+}
+async function runStockSearch(){
+  const btn=$('#stockBtn'); btn.disabled=true; btn.textContent='탐색 중';
+  const stock=readStock();
+  const box=$('#stockRecs');
+  if(!stock.length){box.innerHTML='<div class="empty">보유 약을 1개 이상 입력하세요.</div>';btn.disabled=false;btn.textContent='재고 탐색 실행';return;}
+  const D=+$('#stockDays').value, maxD=+$('#stockMaxDose').value;
+  const t0=parseT($('#stockT0').value);
+  const dmax=Math.max(0,+$('#stockDmax').value||2);
+  const asC=parseT($('#as').value), aeC=parseT($('#ae').value);
+  ocW=Math.max(20,Math.min(200,parseFloat($('#weight').value)||70)); ocCache={};
+  const L=D*1440+720;
+  const cands=dayCandidates(stock,maxD);
+  const stepEval=(aeC-asC)>150?2:1;
+  const BEAM=10;
+  let beams=[{total:new Float64Array(L),used:stock.map(x=>({id:x.med.id,left:x.cnt})),meanSum:0,plan:[]}];
+  const tick=()=>new Promise(r=>setTimeout(r,0));
+  let evals=0;
+  const prog=t=>{$('#stockRecs').innerHTML='<div class="empty">'+t+'</div>';};
+
+  for(let d=0;d<D;d++){
+    const dayStart=d*1440+t0;
+    const{ws,we}=stockWindow(d,asC,aeC);
+    const next=[];
+    for(let bi=0;bi<beams.length;bi++){
+      const b=beams[bi];
+      for(const cand of cands){
+        // 재고 확인
+        const need={};
+        let ok=true;
+        for(const e of cand){const n=e.n||1;need[e.med]=(need[e.med]||0)+n;}
+        for(const k in need){const u=b.used.find(u=>u.id==k);if(!u||u.left<need[k]){ok=false;break;}}
+        if(!ok) continue;
+        // 곡선 합산 + 활동구간 평가
+        const tot=b.total.slice();
+        for(const e of cand){
+          const arr=oc1(e.med,dayStart+(e.off||0));
+          for(let t=dayStart+(e.off||0);t<L;t++) tot[t]+=arr[t];
+        }
+        let mn=Infinity,mx=-1,sum=0,n=0,slope=0,prev=-1;
+        for(let t=ws;t<=we;t+=stepEval){
+          if(tot[t]<mn)mn=tot[t]; if(tot[t]>mx)mx=tot[t]; sum+=tot[t];n++;
+          if(prev>=0){const sl=tot[t]-prev;if(sl>slope)slope=sl;}
+          prev=tot[t];
+        }
+        evals++;
+        if(mx-mn>dmax) continue;
+        if(stepEval>1){ mn=Infinity;mx=-1;prev=-1;
+          for(let t=ws;t<=we;t++){ if(tot[t]<mn)mn=tot[t]; if(tot[t]>mx)mx=tot[t];
+            if(prev>=0){const sl=tot[t]-prev;if(sl>slope)slope=sl;} prev=tot[t]; } }
+        next.push({total:tot,
+          used:b.used.map(u=>({id:u.id,left:u.left-(need[u.id]||0)})),
+          meanSum:b.meanSum+sum/n,
+          plan:b.plan.concat([{day:d,events:cand.map(e=>({med:e.med,n:e.n||1,off:e.off||0}))}])});
+      }
+      if((evals&0x1fff)===0){prog('탐색 중… '+d+'일차 '+evals.toLocaleString()+' 평가'); await tick();}
+    }
+    next.sort((a,b)=>b.meanSum-a.meanSum);
+    beams=next.slice(0,BEAM);
+    if(!beams.length){break;}
+  }
+  btn.disabled=false; btn.textContent='재고 탐색 실행';
+  if(!beams.length){
+    box.innerHTML='<div class="empty">재고로는 '+D+'일간 조건(차 ≤ '+dmax.toFixed(1)+' ng/mL)을<br>만족할 수 없습니다. 기간을 줄이거나 재고를 늘려보세요.</div>';return;
+  }
+  renderStockRecs(beams,{D,dmax,asC,aeC,t0});
+}
+function renderStockRecs(beams,cond){
+  const box=$('#stockRecs'); box.innerHTML='';
+  beams.forEach((r,i)=>{
+    const sched=r.plan.map(p=>{
+      const d=p.day+1;
+      const ev=p.events.map(e=>{const m=medOf(e.med);
+        return m.name+' '+m.dose+'mg'+(e.n>1?' ×'+e.n:'')+' @'+pad2(Math.floor((cond.t0+e.off)%1440/60))+':'+pad2((cond.t0+e.off)%60);
+      }).join(' + ');
+      return '<b>'+d+'일차</b> '+ev;
+    }).join('<br>');
+    const mean=(r.meanSum/cond.D).toFixed(2);
+    const div=document.createElement('div'); div.className='rec'+(i===0?' best':'');
+    div.innerHTML=
+      '<div class="rec-head"><span class="rec-name">'+(i===0?'BEST FIT':'#'+(i+1))+'</span>'+
+      '<span class="badge">'+cond.D+'일</span></div>'+
+      '<div class="rec-times">'+sched+'</div>'+
+      '<div class="rec-grid" style="grid-template-columns:repeat(2,1fr);margin-top:7px">'+
+        '<div><div class="lb">활동시간 평균 (일평균)</div><b class="num">'+mean+' ng/mL</b></div>'+
+        '<div style="text-align:right"><button class="btn-apply" data-sapply="'+i+'">1일차 계획 적용</button></div>'+
+      '</div>';
+    box.appendChild(div);
+  });
+  box.querySelectorAll('[data-sapply]').forEach(el=>el.onclick=()=>{
+    const r=beams[+el.dataset.sapply],d1=r.plan[0].events,byMed={};
+    d1.forEach(e=>{
+      const min=cond.t0+e.off;
+      for(let k=0;k<e.n;k++) (byMed[e.med]=byMed[e.med]||[]).push(min);
+    });
+    plans=Object.entries(byMed).map(([med,mins])=>({medId:+med,
+      times:mins.map(m=>pad2(Math.floor(m%1440/60))+':'+pad2(m%60)).sort()}));
+    setMode('manual');
+    update();
+  });
+}
+$('#stockBtn').onclick=runStockSearch;
+$('#stockDmax').oninput=()=>{};
 
 /* 인트로: 클릭하면 본문 진입 */
 $('#splash').addEventListener('click',()=>{$('#splash').classList.add('out');},{once:true});
