@@ -16,29 +16,9 @@
     font-size:13px;letter-spacing:.01em;-webkit-font-smoothing:antialiased}
   .num{font-family:ui-monospace,"SF Mono",Consolas,monospace;font-variant-numeric:tabular-nums}
 
-  /* ── intro ── */
-  #splash{position:fixed;inset:0;z-index:99;background:#000;cursor:pointer;
-    display:flex;align-items:center;justify-content:center;overflow:hidden;transition:opacity .8s}
-  #splash.out{opacity:0;pointer-events:none;display:none}
-  .pill-stage{position:relative;width:340px;height:200px;display:flex;align-items:center;justify-content:center}
-  .pill{width:74px;height:26px;border-radius:13px;background:#fff;position:relative;z-index:3;
-    box-shadow:0 0 24px #ffffff44;animation:pillSeq 4.6s cubic-bezier(.2,.7,.3,1) .3s forwards}
-  @keyframes pillSeq{
-    0%{transform:scale(0);opacity:0}
-    22%{transform:scale(1);opacity:1}
-    48%{transform:scale(1)}
-    100%{transform:scaleX(16) scaleY(.55);opacity:.85}
-  }
-  .glow{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:74px;height:26px;border-radius:13px;
-    background:#fff;filter:blur(18px);opacity:0;z-index:1;animation:glowUp 4.6s ease .3s forwards}
-  @keyframes glowUp{0%{opacity:0}30%{opacity:.45}100%{opacity:.85}}
-  #splash h1{position:absolute;top:60px;left:0;right:0;text-align:center;color:#fff;font-size:15px;
-    font-weight:600;letter-spacing:.5em;text-transform:uppercase}
-  @keyframes blink{0%,100%{opacity:.2}50%{opacity:.8}}
-
   /* ── main ── */
   header{max-width:1180px;margin:0 auto;padding:calc(22px + env(safe-area-inset-top,0px)) calc(16px + env(safe-area-inset-left,0px)) 10px;border-bottom:1px solid var(--line)}
-  header h1{cursor:pointer;font-size:15px;font-weight:700;letter-spacing:.42em;text-transform:uppercase;color:#fff}
+  header h1{font-size:15px;font-weight:700;letter-spacing:.42em;text-transform:uppercase;color:#fff}
   .wrap{max-width:1180px;margin:0 auto;padding:16px 16px 46px;display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start}
   @media(max-width:900px){
     .wrap{grid-template-columns:1fr;gap:12px;padding:12px calc(12px + env(safe-area-inset-left,0px)) 40px}
@@ -145,14 +125,6 @@
 </head>
 <body>
 
-<!-- ── 인트로: 검은 바탕, 흰 알약이 옆으로 퍼짐, 클릭하면 진입 ── -->
-<div id="splash">
-  <h1>META CURVE</h1>
-  <div class="pill-stage">
-    <div class="glow"></div>
-    <div class="pill"></div>
-  </div>
-</div>
 
 <header>
   <h1>META<b> </b>CURVE</h1>
@@ -914,12 +886,6 @@ $('#stockBtn').onclick=runStockSearch;
 $('#stockDmax').oninput=()=>{};
 
 /* 인트로: 클릭하면 본문 진입 */
-$('#splash').addEventListener('click',()=>{$('#splash').classList.add('out');});
-document.querySelector('header h1').addEventListener('click',()=>{
-  const sp=$('#splash'),pill=sp.querySelector('.pill');
-  sp.classList.remove('out');
-  if(pill){const n=pill.cloneNode(true);pill.parentNode.replaceChild(n,pill);}
-});
 
 /* 초기: 예시 계획 + 초기 탐색 1회 */
 plans=[{medId:2,times:['07:00']},{medId:5,times:['08:00']}];
