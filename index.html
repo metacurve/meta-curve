@@ -42,7 +42,14 @@
   header{max-width:1180px;margin:0 auto;padding:22px 16px 10px;border-bottom:1px solid var(--line)}
   header h1{font-size:15px;font-weight:700;letter-spacing:.42em;text-transform:uppercase;color:#fff}
   .wrap{max-width:1180px;margin:0 auto;padding:16px 16px 46px;display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start}
-  @media(max-width:900px){.wrap{grid-template-columns:1fr}}
+  @media(max-width:900px){
+    .wrap{grid-template-columns:1fr;gap:12px}
+    .wrap>.chartcard{order:-1}      /* 모바일: 그래프 카드가 맨 위 */
+    .leftcol{display:grid;grid-template-columns:1fr;gap:0}
+  }
+  @media(min-width:901px) and (max-width:1100px){
+    .wrap{grid-template-columns:300px 1fr}
+  }
   .card{background:transparent;border:none;border-radius:0;padding:0;margin-bottom:22px}
   .card h2{font-size:10px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.26em;
     margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
@@ -129,7 +136,7 @@
 
 <div class="wrap">
   <!-- ── 좌: 최적화 설정 + 수동 계획 ── -->
-  <div>
+  <div class="leftcol">
     <div class="card" style="padding:10px">
       <div class="seg" style="width:100%">
         <button id="tabAuto" class="on" style="flex:1">자동 최적화</button>
@@ -218,7 +225,7 @@
   </div>
 
   <!-- ── 우: 지표 + 차트 + 표 ── -->
-  <div class="card">
+  <div class="card chartcard">
     <h2>총 혈중농도 (합산, ng/mL)</h2>
     <div id="dayNav" style="display:none;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
     <div class="stats">
@@ -271,6 +278,17 @@ const MEDS=[
  {id:11,name:'메디키넷',  dose:40, type:'la'}
 ];
 const COLORS={concerta:'#c9974f',ir:'#7d95c9',la:'#5f9f86'};
+const PRICE={18:440,27:520,36:590,45:null,54:null,5:{ir:180,la:210},10:{ir:200,la:240},20:290,30:330,40:360};
+function priceOf(med){const p=PRICE[med.dose];if(p===null||p===undefined)return null;
+  if(typeof p==='object')return p[med.type]??null;return p;}
+function costOf(doses){
+  let sum=0;
+  for(const d of doses){const m=medOf(d.med),p=priceOf(m);
+    if(p===null)return null;
+    const n=d.n||1; sum+=p*n;}
+  return sum;
+}
+
 let plans=[],sim=null;
 const $=s=>document.querySelector(s);
 const fmt=m=>{const d=Math.floor(m/1440),h=Math.floor(m%1440/60),mm=m%60;
@@ -443,6 +461,7 @@ function renderRecs(top,cond){
         '<div><div class="lb">활동 내 평균</div><b class="num">'+r.r.mean.toFixed(2)+'</b></div>'+
         '<div><div class="lb">최고−최저</div><b class="num">'+r.r.diff.toFixed(2)+'</b></div>'+
         '<div><div class="lb">최대 기울기</div><b class="num slope">'+r.r.slope.toFixed(3)+'</b></div>'+
+        '<div><div class="lb">하루 약값</div><b class="num">'+(costOf(r.doses)!==null?costOf(r.doses).toLocaleString()+'원':'—')+'</b></div>'+
         '<div style="display:flex;align-items:flex-end;justify-content:flex-end"><button class="btn-apply" data-apply="'+i+'">계획 적용</button></div>'+
       '</div>';
     box.appendChild(div);
@@ -645,7 +664,7 @@ function renderStats(){
     lg.innerHTML+='<span><i style="background:'+COLORS[s.med.type]+';opacity:.6"></i>'+s.med.name+' '+s.med.dose+'mg <span class="num">@'+fmt(s.min).slice(0,5)+'</span></span>';});
   lg.innerHTML+='<span><i style="background:#f5f7fa"></i>총 합산</span><span><i style="background:#3a3f47"></i>활동구간</span>';
 }
-function update(){renderPlans();multi=null;dayExpanded=false;renderDayNav();sim=simulate();draw();renderStats();}
+function update(){renderPlans();multi=null;renderDayNav();sim=simulate();draw();renderStats();}
 
 $('#addPlan').onclick=()=>{plans.push({medId:0,times:[$('#t0').value||'07:00']});update();};
 $('#weight').oninput=()=>{update();};
@@ -682,13 +701,16 @@ function renderInv(){
     });
     const div=document.createElement('div');
     div.style.cssText='display:flex;gap:6px;margin-bottom:6px;align-items:center';
-    div.innerHTML='<select data-im="'+ri+'" style="flex:2">'+opts+'</select>'+
+    div.innerHTML='<span class="dot" style="background:'+COLORS[medOf(r.medId).type]+';flex:none"></span>'+
+      '<select data-im="'+ri+'" style="flex:2">'+opts+'</select>'+
       '<input type="number" data-ic="'+ri+'" value="'+r.cnt+'" min="1" max="60" style="flex:1" title="개수">'+
       '<span style="font-size:10px;color:var(--faint);flex:none">개</span>'+
       '<button class="btn-del" data-idel="'+ri+'">✕</button>';
     box.appendChild(div);
   });
-  box.querySelectorAll('select[data-im]').forEach(el=>el.onchange=()=>{invRows[+el.dataset.im].medId=+el.value;});
+  box.querySelectorAll('select[data-im]').forEach(el=>el.onchange=()=>{
+    invRows[+el.dataset.im].medId=+el.value;
+    el.closest('div').querySelector('.dot').style.background=COLORS[medOf(+el.value).type];});
   box.querySelectorAll('input[data-ic]').forEach(el=>el.oninput=()=>{invRows[+el.dataset.ic].cnt=Math.max(1,parseInt(el.value)||1);});
   box.querySelectorAll('[data-idel]').forEach(el=>el.onclick=()=>{invRows.splice(+el.dataset.idel,1);renderInv();});
 }
@@ -836,7 +858,7 @@ function renderStockRecs(beams,cond){
   });
   box.querySelectorAll('[data-sapply]').forEach(el=>el.onclick=()=>{
     multi=buildMulti(beams[+el.dataset.sapply].plan,cond);
-    activeDay=0; dayExpanded=false;
+    activeDay=0;
     renderDayNav(); draw(); renderStats();
   });
 }
@@ -845,17 +867,9 @@ function renderDayNav(){
   if(!multi||multi.D<2){nav.style.display='none';return;}
   nav.style.display='flex';
   let html='';
-  if(!dayExpanded){
-    html='<button class="daychip on" id="dayLabel">'+(activeDay+1)+'일차</button>'+
-         '<button id="dayArrow" title="일차 펼치기" style="padding:5px 9px">▸</button>';
-  }else{
-    for(let d=0;d<multi.D;d++)
-      html+='<button class="daychip'+(d===activeDay?' on':'')+'" data-day="'+d+'">'+(d+1)+'일차</button>';
-    html+='<button id="dayArrow" title="접기" style="padding:5px 9px">◂</button>';
-  }
+  for(let d=0;d<multi.D;d++)
+    html+='<button class="daychip'+(d===activeDay?' on':'')+'" data-day="'+d+'">'+(d+1)+'일차</button>';
   nav.innerHTML=html;
-  $('#dayArrow').onclick=()=>{dayExpanded=!dayExpanded;renderDayNav();};
-  const dl=$('#dayLabel'); if(dl)dl.onclick=()=>{dayExpanded=!dayExpanded;renderDayNav();};
   nav.querySelectorAll('[data-day]').forEach(el=>el.onclick=()=>{
     activeDay=+el.dataset.day; renderDayNav(); draw(); renderStats();});
 }
