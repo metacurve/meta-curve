@@ -535,13 +535,17 @@ function draw(){
   ctx.stroke();
   cv._geom={padL,padR,padT,padB};
 }
+let tapClear=false;
+cv.addEventListener('touchstart',()=>{tapClear=(tip.style.display==='block');},{passive:true});
 cv.addEventListener('mousemove',e=>{
+  if(tapClear){tapClear=false;tip.style.display='none';draw();return;}
   if(multi){
     const r=cv.getBoundingClientRect(),g=cv._day;
     const S=g.S,E=g.E;
     const m=Math.round(S+(e.clientX-r.left-44)/(r.width-44-30)*(E-S));
-    if(m<S||m>E){tip.style.display='none';return;}
+    if(m<S||m>E){tip.style.display='none';draw();return;}
     const Xc=m2=>44+(r.width-44-30)*(m2-S)/(E-S);
+    draw();
     ctx.save();ctx.setTransform(window.devicePixelRatio||1,0,0,window.devicePixelRatio||1,0,0);
     ctx.strokeStyle='#2a303c';ctx.beginPath();ctx.moveTo(Xc(m),12);ctx.lineTo(Xc(m),330-26);ctx.stroke();ctx.restore();
     let rows='<b>'+(activeDay+1)+'일차 '+fmt(m%1440).slice(0,5)+'</b><br><span style="font-weight:600">총 '+multi.total[m].toFixed(2)+' ng/mL</span>';
@@ -558,8 +562,9 @@ cv.addEventListener('mousemove',e=>{
   if(!sim||!sim.series.length){tip.style.display='none';return;}
   const r=cv.getBoundingClientRect(),g=cv._geom;
   const m=Math.round((e.clientX-r.left-g.padL)/(r.width-g.padL-g.padR)*SIM);
-  if(m<0||m>SIM){tip.style.display='none';return;}
+  if(m<0||m>SIM){tip.style.display='none';draw();return;}
   const Xc=m=>g.padL+(r.width-g.padL-g.padR)*m/SIM;
+  draw();
   ctx.save();ctx.setTransform(window.devicePixelRatio||1,0,0,window.devicePixelRatio||1,0,0);
   ctx.strokeStyle='#2a3542';ctx.beginPath();ctx.moveTo(Xc(m),g.padT);ctx.lineTo(Xc(m),330-g.padB);ctx.stroke();ctx.restore();
   let rows='<b>'+fmt(m)+'</b><br><span style="font-weight:700">총 '+sim.total[m].toFixed(2)+' ng/mL</span>';
