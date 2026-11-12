@@ -414,26 +414,33 @@ async function runSearch(){
   }
   const offs=(st,max)=>{const a=[];for(let o=st;o<=max;o+=st)a.push(o);return a;};
   const o1s=offs(15,660),o2s=offs(30,420),o3s=offs(60,300);
-  const YIELD=0x3fff;
+  // 시분할 양보: 24ms마다 UI에 제어권 반납 → 로드/탐색 중 렉 제거
+  let lastYield=performance.now();
+  const maybeYield=async()=>{
+    if(performance.now()-lastYield>24){
+      prog('탐색 중… '+count.toLocaleString()+'개 평가'); await tick();
+      lastYield=performance.now();
+    }
+  };
 
   for(const m of MEDS){
     consider([{med:m.id,off:0}]);
-    if((count&YIELD)===0){prog('탐색 중… '+count.toLocaleString()+'개 평가'); await tick();}
+    await maybeYield();
   }
   if(maxD>=2) for(const m of MEDS) for(const b of pool) for(const t2 of o1s){
     consider([{med:m.id,off:0},{med:b.id,off:t2}]);
-    if((count&YIELD)===0){prog('탐색 중… '+count.toLocaleString()+'개 평가'); await tick();}
+    await maybeYield();
   }
   if(maxD>=3) for(const m of MEDS) for(const b1 of pool) for(const t2 of o2s)
     for(const b2 of pool) for(let t3=t2+60;t3<=540;t3+=30){
       consider([{med:m.id,off:0},{med:b1.id,off:t2},{med:b2.id,off:t3}]);
-      if((count&YIELD)===0){prog('탐색 중… '+count.toLocaleString()+'개 평가'); await tick();}
+      await maybeYield();
     }
   if(maxD>=4) for(const m of MEDS) for(const b1 of pool) for(const t2 of o3s)
     for(const b2 of pool) for(let t3=t2+60;t3<=420;t3+=60)
       for(const b3 of pool) for(let t4=t3+60;t4<=600;t4+=60){
         consider([{med:m.id,off:0},{med:b1.id,off:t2},{med:b2.id,off:t3},{med:b3.id,off:t4}]);
-        if((count&YIELD)===0){prog('탐색 중… '+count.toLocaleString()+'개 평가'); await tick();}
+        await maybeYield();
       }
 
   btn.disabled=false; btn.textContent='조합 탐색 실행';
